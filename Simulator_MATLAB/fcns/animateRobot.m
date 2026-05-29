@@ -3,8 +3,14 @@ function [t,COM,HIP,FOOT] = animateRobot(tin,Xin,Uin,Fin,p)
 % If you want to generate a .mp4 movie file
 boolAnimate = p.boolAnimate;            
 if boolAnimate
-    name = ['video.mp4'];
-    vidfile = VideoWriter(name,'MPEG-4');
+    % El perfil 'MPEG-4' solo existe en Windows/Mac; en Linux se usa 'Motion JPEG AVI'
+    if ispc || ismac
+        name = 'video.mp4';
+        vidfile = VideoWriter(name,'MPEG-4');
+    else
+        name = 'video.avi';
+        vidfile = VideoWriter(name,'Motion JPEG AVI');
+    end
     open(vidfile);
 end
 ylim_scale = 1.5;
@@ -224,8 +230,14 @@ for ii = 1:nt
     drawnow
 
     if boolAnimate
+        fr = getframe(gcf);
+        % getframe puede variar +-1 px (sobre todo sin pantalla); forzar tamaño fijo
+        % con remuestreo por indexacion (sin necesidad de Image Processing Toolbox)
+        ri = round(linspace(1,size(fr.cdata,1),600));
+        ci = round(linspace(1,size(fr.cdata,2),1400));
+        fr.cdata = fr.cdata(ri,ci,:);
         for repeat = 1:3
-            writeVideo(vidfile,getframe(gcf))
+            writeVideo(vidfile,fr)
         end
     end
 

@@ -1,0 +1,7 @@
+# Salida del simulador (se regenera al correr MAIN.m)
+Simulator_MATLAB/video.avi
+
+# Temporales de MATLAB / Octave
+*.asv
+*.autosave
+octave-workspace
