@@ -83,7 +83,7 @@ delamina y se parte). Vale la pena reorientar pieza por pieza.
 | `1200-0032-0001` | Pattern mount 1s-2post 32 mm | 1 | |
 | `1205-0001-0003` | Dual block mount | 1 | |
 | `1401-0043-0032` | Clamping mount 2-side, **bore 32 mm** | 3 | Se cierra sobre el tubo de 32 mm → necesita ranura + tornillo |
-| `1400-0032-0032` | Clamping mount 1-side, **bore 32 mm** | 4 | idem |
+| `1400-0032-0032` | Clamping mount 1-side, **bore 32 mm** | 2 | **Opcional** (BOM: solo si se usa encoder en joint 2) |
 | `1400-0032-0014` | Clamping mount 1-side, **bore 14 mm** | 2 | Para el tubo de la pata (14 mm) |
 | `1402-0043-0014` | Clamping mount 2s-1post, bore 14 mm | 1 | |
 | `1603-0032-0032` | Pillow block (face) | 2 | **Lleva balero comprado** (1601) insertado |
