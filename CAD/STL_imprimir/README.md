@@ -8,13 +8,15 @@ ver la lista "No imprimir" más abajo y el [BOM completo](../../HOPPY_BoM.xlsx).
 > ⚠️ **Aviso de ingeniería.** HOPPY fue diseñado en aluminio a propósito: *"we intentionally
 > avoid plastic 3D printed parts for their short working life under impact loads"*. El robot
 > salta y golpea el suelo, así que las piezas impresas pueden agrietarse. Para un prototipo
-> de curso es viable, pero **usa material tenaz (no PLA)** y refuerza las zonas de carga.
+> de curso es viable. El material ideal sería tenaz (PETG/ABS/nylon), pero **en este proyecto
+> el requisito es imprimir en PLA** → ver la sección **"Impresión en PLA"** para los ajustes
+> que maximizan su resistencia y las precauciones de uso.
 
 ## Especificaciones de impresión recomendadas
 
 | Parámetro | Valor | Por qué |
 |---|---|---|
-| **Material** | **PETG** (recomendado), o **ABS/ASA/Nylon** | Tenaces al impacto. **Evitar PLA** (frágil, se astilla). |
+| **Material** | **PETG/ABS/Nylon** ideal · **PLA** en este proyecto (ver sección PLA) | Los primeros son tenaces; el PLA es frágil pero usable con los ajustes de abajo. |
 | Boquilla | 0.4 mm | Estándar |
 | Altura de capa | 0.20 mm | Balance resistencia/tiempo |
 | Perímetros (paredes) | **4** (≥1.6 mm) | La resistencia real viene de las paredes, no del relleno |
@@ -32,6 +34,39 @@ deslaminan si el esfuerzo las separa). Es el factor #1 de durabilidad.
 Los agujeros suelen salir ~0.2–0.4 mm chicos. Para los **M4**, pasa una broca de 4 mm o
 ajusta el escalado de agujeros en el slicer. Haz una **pieza de prueba** (un bracket chico)
 antes de imprimir todo el lote para validar el ajuste.
+
+## Impresión en PLA (requisito de este proyecto)
+
+El PLA es **rígido pero frágil**: falla por impacto y por delaminación entre capas. No lo
+podemos cambiar, así que la estrategia es **maximizar la unión entre capas y el grosor de
+pared**, e imprimir con la orientación correcta. Ajustes recomendados:
+
+| Parámetro | Valor PLA | Por qué |
+|---|---|---|
+| **Temp. boquilla** | **210–220 °C** (extremo alto del PLA) | Mejor fusión entre capas = menos delaminación al impacto |
+| Temp. cama | 60 °C | Adhesión |
+| **Velocidad de perímetros** | **lenta, 30–40 mm/s** | Capas mejor soldadas (la velocidad mata la resistencia) |
+| **Ventilador** | **40–70 %** (no 100 %) | Demasiado enfriamiento debilita la unión entre capas; baja el fan en piezas de carga |
+| **Perímetros (paredes)** | **5** (≈2.0 mm) | El PLA aguanta por pared, no por relleno |
+| **Relleno** | **50–70 %** (giroide/cúbico) | Más material continuo que absorbe impacto |
+| Altura de capa | 0.16–0.20 mm | Capa más fina = más uniones y mejor detalle |
+| Capas top/bottom | 6 | Cierre robusto |
+| **Tipo de PLA** | **PLA+ / Tough PLA** si tienen | Bastante más tenaz que el PLA estándar |
+
+**Orientación (lo más importante en PLA):** imprime cada pieza **acostada y plana**, para que
+el golpe del aterrizaje quede **a lo largo de las capas, no perpendicular** (perpendicular =
+delamina y se parte). Vale la pena reorientar pieza por pieza.
+
+**Precauciones de uso con PLA:**
+- El PLA **se reblandece con el calor** (~55–60 °C). No dejes el robot al sol ni cerca de
+  los motores calientes mucho tiempo; revisa que no se deformen los mounts.
+- Empieza las pruebas con **fuerza de salto baja** y sube de a poco; espera **reimprimir
+  piezas agrietadas** (sobre todo pillow blocks, mounts de la pata y el pie).
+- Ten **repuestos impresos** de las piezas más castigadas (pata, pie, mounts inferiores).
+- Aplica **thread locker / aprieta seguido** los tornillos: la vibración + PLA aflojan.
+
+> Si más adelante consiguen PETG aunque sea para las **piezas críticas de la pata inferior**
+> (las que reciben el impacto directo), valdría mucho la pena combinarlo con el PLA del resto.
 
 ## Piezas a imprimir (29 únicas)
 
