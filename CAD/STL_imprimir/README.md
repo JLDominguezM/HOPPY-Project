@@ -68,22 +68,19 @@ delamina y se parte). Vale la pena reorientar pieza por pieza.
 > Si más adelante consiguen PETG aunque sea para las **piezas críticas de la pata inferior**
 > (las que reciben el impacto directo), valdría mucho la pena combinarlo con el PLA del resto.
 
-## Piezas a imprimir (29 únicas)
+## Piezas a imprimir (25 únicas — exactamente las del BOM)
 
 | STL | Descripción | Cant. | Notas |
 |---|---|---:|---|
 | `1140-0006-0144` | Baseplate 144 mm (base del gantry) | 1 | Si tu cama < 144 mm, pártela o usa lámina |
 | `1123-0048-0144` | Pattern plate 1×5 (144 mm) | 4 | Estructura principal de los links |
-| `1123-0048-0048` | Pattern plate 1×5 (48 mm) | 1 | |
 | `1121-0003-0096` | U-channel 3-hole 96 mm | 1 | |
 | `1120-0001-0048` | U-channel 1-hole 48 mm | 1 | |
 | `1108-0001-0001` | Flat bracket 1-1 | 4 | |
 | `1111-0004-0001` | Angle bracket 4-1 | 2 | |
 | `1102-0005-0040` | Flat beam 5-hole 40 mm | 2 | |
-| `1102-0011-0088` | Flat beam | 1 | |
 | `1201-0043-0002` | Quad block mount | 2 | Monta los motores |
 | `1200-0032-0001` | Pattern mount 1s-2post 32 mm | 1 | |
-| `1200-0024-0001` | Pattern mount | 1 | |
 | `1205-0001-0003` | Dual block mount | 1 | |
 | `1401-0043-0032` | Clamping mount 2-side, **bore 32 mm** | 3 | Se cierra sobre el tubo de 32 mm → necesita ranura + tornillo |
 | `1400-0032-0032` | Clamping mount 1-side, **bore 32 mm** | 4 | idem |
@@ -98,7 +95,6 @@ delamina y se parte). Vale la pena reorientar pieza por pieza.
 | `1502-0006-0020` | Espaciador 4 mm-6OD-2 | 4 | Opcional |
 | `1502-0006-0030` | Espaciador 4 mm-6OD-3 | 4 | Opcional |
 | `1502-0006-0100` | Espaciador 4 mm-6OD-10 | 4 | Opcional |
-| `1502-0006-0120` | Espaciador 4 mm-6OD-12 | 4 | Opcional |
 | `1500-0010-0032` | Espaciador plástico | 1 | Opcional |
 | `1501-0006-0430` | Standoff M4 (eje tensor de banda) | 1 | |
 
