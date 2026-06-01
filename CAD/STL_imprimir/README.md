@@ -10,11 +10,10 @@ imprimir son **IMP-1 … IMP-30 + CASE 1/2**, no las piezas goBilda.
 ## Dónde está cada cosa
 - **Qué imprimir + cantidades + material (PLA/ABS) + gramos + tiempo:** checklist **#18**.
 - **Inventario completo de materiales (comprar/tener):** issue **#5**.
-- **Piezas a imprimir (SolidWorks):** carpeta [`SLDPRT/`](SLDPRT/) en este repo, con las
-  **33 piezas del BOM** (`IMP-*.SLDPRT` + `CASE 1/2`). De cada una se **exporta el STL**
-  (Archivo -> Guardar como -> STL, calidad Fina). Los STL exportados pueden guardarse aquí
-  mismo. No se incluyeron `IMP-3`, `IMP-6` (versiones enteras, no se imprimen) ni `IMP-23`
-  (no está en el BOM).
+- **STL listos para imprimir:** carpeta [`STL/`](STL/) con las **33 piezas del BOM**,
+  separadas por material: [`STL/PLA/`](STL/PLA/) (29 piezas) y [`STL/ABS/`](STL/ABS/)
+  (4: IMP-16, IMP-17, IMP-20, IMP-30). Listas para rebanar. No se incluyen `IMP-3`,
+  `IMP-6` (versiones enteras) ni `IMP-23` (fuera del BOM).
 - **Empezar por las largas** (>15 h c/u): IMP-3A, IMP-3B, IMP-6A, IMP-6B, IMP-27, IMP-28.
 
 ## Resumen de impresión (del BOM)
