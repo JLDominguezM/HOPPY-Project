@@ -10,9 +10,12 @@ imprimir son **IMP-1 … IMP-30 + CASE 1/2**, no las piezas goBilda.
 ## Dónde está cada cosa
 - **Qué imprimir + cantidades + material (PLA/ABS) + gramos + tiempo:** checklist **#18**.
 - **Inventario completo de materiales (comprar/tener):** issue **#5**.
-- **CAD fuente del rediseño:** paquete `DISEÑO` (SolidWorks): `IMP-*.SLDPRT`, ensambles
-  `HOPPY-E0/E1/E2`, y `HOPPY-E0.STEP`. De ahí se **exportan los STL** (Archivo →
-  Guardar como → STL) para imprimir.
+- **Piezas a imprimir (SolidWorks):** carpeta [`SLDPRT/`](SLDPRT/) en este repo, con las
+  **33 piezas del BOM** (`IMP-*.SLDPRT` + `CASE 1/2`). De cada una se **exporta el STL**
+  (Archivo -> Guardar como -> STL, calidad Fina). Los STL exportados pueden guardarse aquí
+  mismo. No se incluyeron `IMP-3`, `IMP-6` (versiones enteras, no se imprimen) ni `IMP-23`
+  (no está en el BOM).
+- **Empezar por las largas** (>15 h c/u): IMP-3A, IMP-3B, IMP-6A, IMP-6B, IMP-27, IMP-28.
 
 ## Resumen de impresión (del BOM)
 - **Total:** 33 piezas → **49 copias** · **~4.27 kg** de filamento · **~240 h** de impresión.
