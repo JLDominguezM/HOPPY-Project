@@ -26,7 +26,7 @@
           <geom type="box" size="0.03 0.03 0.03" rgba="0.9 0.7 0.1 1"/>
         </body>
         <body name="contrapeso" pos="-0.45 0 0">
-          <inertial pos="0 0 0" mass="1.6" diaginertia="0.003 0.003 0.003"/>
+          <inertial pos="0 0 0" mass="2.1" diaginertia="0.003 0.003 0.003"/>
           <geom type="cylinder" fromto="0 -0.02 0 0 0.02 0" size="0.05" rgba="0.5 0.5 0.5 1"/>
         </body>
         <body name="link3" pos="0.556 0 0">
