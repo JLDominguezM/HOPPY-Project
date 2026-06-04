@@ -9,3 +9,4 @@ octave-workspace
 # Python
 __pycache__/
 *.pyc
+mujoco/sweep_top.json
