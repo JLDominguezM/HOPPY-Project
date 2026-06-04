@@ -1,0 +1,56 @@
+<mujoco model="hoppy">
+  <compiler angle="radian" autolimits="true"/>
+  <option timestep="0.001" integrator="implicitfast" gravity="0 0 -9.81"/>
+  <default>
+    <joint damping="0"/>
+    <geom contype="0" conaffinity="0"/>
+    <default class="contact">
+      <geom contype="1" conaffinity="1" solref="0.002 1" solimp="0.95 0.99 0.001"
+            friction="2.0 0.1 0.1"/>
+    </default>
+  </default>
+  <worldbody>
+    <light pos="0 0 2" dir="0 0 -1"/>
+    <geom name="floor" class="contact" type="plane" size="3 3 0.1" rgba="0.8 0.8 0.8 1"/>
+    <geom name="post" type="cylinder" fromto="0 0 0 0 0 0.2" size="0.02" rgba="0.2 0.2 0.2 1"/>
+    <body name="link1" pos="0 0 0.2">
+      <joint name="theta1" type="hinge" axis="0 0 1"/>
+      <inertial pos="0 0 0" mass="0.268" diaginertia="0.00115952 0.00104649 0.00030518"/>
+      <geom type="box" size="0.02 0.02 0.02" rgba="0.4 0.4 0.8 1"/>
+      <body name="link2" pos="0 0 0">
+        <joint name="theta2" type="hinge" axis="0 1 0"/>
+        <inertial pos="-0.25 0 0" mass="0.15" diaginertia="0.002 0.05 0.05"/>
+        <geom type="cylinder" fromto="-0.45 0 0 0.556 0 0" size="0.008" rgba="0.7 0.7 0.2 1"/>
+        <body name="cuerpo_cadera" pos="0.556 0 0">
+          <inertial pos="0 0 0" mass="1.2" diaginertia="0.002 0.002 0.002"/>
+          <geom type="box" size="0.03 0.03 0.03" rgba="0.9 0.7 0.1 1"/>
+        </body>
+        <body name="contrapeso" pos="-0.45 0 0">
+          <inertial pos="0 0 0" mass="1.6" diaginertia="0.003 0.003 0.003"/>
+          <geom type="cylinder" fromto="0 -0.02 0 0 0.02 0" size="0.05" rgba="0.5 0.5 0.5 1"/>
+        </body>
+        <body name="link3" pos="0.556 0 0">
+          <joint name="theta3" type="hinge" axis="0 1 0" armature="0.005065269999999999"/>
+          <inertial pos="0.048 0 0.077" mass="0.656" diaginertia="0.0008211 0.00235762 0.0016834"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.096" size="0.012" rgba="0.8 0.3 0.3 1"/>
+          <body name="link4" pos="0 0 -0.096">
+            <joint name="theta4" type="hinge" axis="0 1 0" armature="0.00580608"
+                   stiffness="3.0" springref="-1.5708"/>
+            <inertial pos="0.002 0.021 0.145" mass="0.149" diaginertia="0.00039424 0.00032191 0.00010442"/>
+            <geom type="capsule" fromto="0 0 0 0 0 -0.1545" size="0.010" rgba="0.3 0.3 0.8 1"/>
+            <geom name="foot" class="contact" type="sphere" pos="0 0 -0.1545" size="0.012" rgba="0.1 0.1 0.1 1"/>
+            <site name="foot_site" pos="0 0 -0.1545" size="0.005"/>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor name="hip"  joint="theta3" gear="1" ctrlrange="-100 100"/>
+    <motor name="knee" joint="theta4" gear="1" ctrlrange="-100 100"/>
+  </actuator>
+  <sensor>
+    <framepos name="foot_pos" objtype="site" objname="foot_site"/>
+    <touch name="foot_touch" site="foot_site"/>
+  </sensor>
+</mujoco>

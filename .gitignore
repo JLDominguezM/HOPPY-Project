@@ -5,3 +5,7 @@ Simulator_MATLAB/video.avi
 *.asv
 *.autosave
 octave-workspace
+
+# Python
+__pycache__/
+*.pyc
