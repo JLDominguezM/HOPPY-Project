@@ -1,40 +1,84 @@
-"""Harness de evaluacion parametrizado para tunear el salto de HOPPY en MuJoCo.
+"""Modelo MuJoCo de HOPPY anclado a los parametros del simulador MATLAB.
 
-evaluate(params) -> dict con score y metricas. Lo usan los agentes de tuning.
-CLI:  python3 tune_eval.py '{"kp":800,"fz_scale":1.0,...}'
-Imprime un JSON con el resultado.
+make_xml(p) genera el MJCF con masas/CoM/inercias/geometria calcadas de
+Simulator_MATLAB/fcns/get_params.m. El "contrapeso" NO es una bola tuneada:
+es link2 (boom+contrapeso) con M2=2.365 kg y CoM en -0.502 m, justo como el
+robot real, lo que fija el balance fisicamente.
 
-Parametros (con defaults):
-  modelo:  cw_mass, cw_pos, body_hip, post_h, knee_stiff, spring_ref, solref0
-  control: kp_x, kp_z, kd, fz_scale, fx_scale, tst, blend, pref_dx, pref_dz,
-           q3_ref, q4_ref
-Score: numero de saltos sostenidos, premiando consistencia de altura y
-       penalizando inestabilidad (NaN o cuerpo bajo el suelo).
+Convencion de frames del control (igual que MATLAB fcn_p_toe_HIP):
+  - El "frame de cadera" esta fijo al boom (link2): X a lo largo del boom
+    (+ hacia la pierna), Z vertical. El pie objetivo en apoyo/vuelo se expresa
+    en [X, Z] de ese frame.
+
+Constantes fisicas (get_params.m) reusadas por control.py / verify.py.
 """
-import sys, json
 import numpy as np
-import mujoco
 from math import comb
 
-# parametros fisicos fijos
-NH, NK = 26.9, 28.8
-Rw, kT, kv = 1.3, 0.0135, 0.0186
-VMAX, IMAX = 12.0, 30.0
+# --- parametros fisicos fijos (get_params.m) ---
+NH, NK = 26.9, 28.8                 # reducciones cadera/rodilla
+Rw, kT, kv = 1.3, 0.0135, 0.0186    # resistencia, cte. par, cte. velocidad
+VMAX, IMAX = 12.0, 30.0             # saturacion 12 V / 30 A
 N = np.array([NH, NK])
-ARM_H, ARM_K = NH**2*7e-6, NK**2*7e-6
-RBOOM, L3, L4 = 0.556, 0.096, 0.1545
-M1, M3, M4 = 0.268, 0.656, 0.149
+I_ROTOR = 7e-6
+ARM_H, ARM_K = NH**2 * I_ROTOR, NK**2 * I_ROTOR    # inercia rotor reflejada N^2*Ir
 DT = 0.001
+
+# --- geometria (get_params.m: HB, LB, LH, DK, LK) ---
+HB, LB = 0.1965, 0.556              # altura del pivote, largo del boom (=Rboom)
+LH = 0.096                          # muslo
+LK = np.hypot(0.052, 0.1545)        # pantorrilla efectiva sqrt(DK^2+LK^2)=0.163
+RBOOM = LB
+
+# --- masas (get_params.m) ---
+M1, M2, M3, M4 = 0.268, 2.365, 0.656, 0.149
+
+# --- CoM por link ---
+# link1 y link2 en su frame MATLAB (coincide con el de MuJoCo: +x hacia la pierna).
+# link3/link4 al centro geometrico del eslabon en el frame MuJoCo (la pierna apunta -z),
+# porque el frame de eslabon de pierna del MATLAB no coincide en orientacion.
+COM1 = (-0.00057, 0.0, -0.0618)
+# CoM x de link2 se CALIBRA (cw_x en DEFAULTS) para que el torque gravitacional
+# de MuJoCo en theta2 iguale al Ge(theta2)=-5.95 N*m del MATLAB (fcn_Ge). El
+# frame de eslabon del MATLAB no coincide en orientacion, asi que -0.502 no se
+# usa directo; el boom queda casi balanceado con leve carga hacia la cadera.
+COM2_YZ = (-0.0368, 0.0)            # offsets laterales (menores)
+COM3 = (0.0, 0.0, -LH / 2)
+COM4 = (0.0, 0.0, -LK / 2)
+
+# --- inercias diagonales (get_params.m) ---
+I1 = (0.00115952, 0.00104649, 0.00030518)
+I2 = (0.00270252, 0.30208952, 0.30305924)   # boom+contrapeso: gran inercia yaw/pitch
+I3 = (0.00082110, 0.00235762, 0.00168340)
+I4 = (0.00039424, 0.00032191, 0.00010442)
+
+# --- resorte de rodilla suave (MATLAB: tau_s = 2*(-0.0242*q4 + 0.0108)) ---
+# Equivale a stiffness*(q4-ref) con stiffness=0.0484, ref=0.0216/0.0484=0.446.
+KNEE_STIFF, KNEE_REF = 0.0484, 0.446
+
+# --- perfil de fuerza de apoyo (Bezier, get_params.m) ---
 FZ_BZ = np.array([0.0, 20.0, 100.0, 0.0, 0.0])
 FX_BZ = np.array([0.0,  0.0, -25.0, 0.0, 0.0])
 
+# Config afinado para igualar la referencia MATLAB (amplitud 7.2 cm, ~2.5 Hz,
+# avance ~1 rad/s alrededor del poste). Hallado por busqueda multi-agente con
+# tune_metric (verify + distancia a la referencia): score 99/100, estable
+# (apex std 4.5 mm), V<=12 / i<=12. La pierna oscila en el plano TANGENCIAL
+# (eje X) para propulsar el avance, igual que el MATLAB. kp_sw alto (vs 150 del
+# MATLAB) mantiene la pierna retraida en vuelo; knee_stiff+fz_scale dan el
+# rebote lento de gran amplitud; j_damp+solref ajustan la disipacion.
 DEFAULTS = dict(
-    cw_mass=2.1, cw_pos=-0.45, body_hip=1.2, post_h=0.20,
-    knee_stiff=3.0, spring_ref=-1.5708, solref0=0.002,
-    j_damp=0.05,                       # amortiguamiento de las juntas pasivas del gantry (fric. rodamientos)
-    kp_x=800.0, kp_z=800.0, kd=15.0, fz_scale=1.0, fx_scale=1.0,
-    tst=0.15, blend=0.010, pref_dx=0.0, pref_dz=0.0,
-    q3_ref=np.pi/3, q4_ref=-np.pi/2,
+    # modelo
+    solref0=0.012683, j_damp=0.290198,
+    cw_x=0.080,                 # CoM x de link2; calibrado a Ge(t2)_MATLAB=-5.95
+    knee_stiff=0.250873,        # resorte de rodilla (rebote)
+    # fase aerea (Ec.17): PD cartesiano del pie en el frame de cadera (plano tangencial)
+    kp_sw=432.980271, kd_sw=5.0, krh=0.094137, p_toe_z=-0.103559,
+    # fase de apoyo (Ec.19): Bezier + PD suave de junta
+    Tst=0.234088, kp_st=0.03, kd_st=0.08, q3_ref=np.pi/3, q4_ref=-np.pi/2,
+    fz_scale=1.576776, fx_scale=1.0,
+    # blending (Ec.20) y FSM
+    blend=0.015719, grf_liftoff=2.290694,
 )
 
 
@@ -44,48 +88,70 @@ def bezier(coef, s):
     return sum(comb(n, i) * coef[i] * s**i * (1 - s)**(n - i) for i in range(n + 1))
 
 
+import os
+MESH_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "meshes")
+
+
 def make_xml(p):
-    I1 = (0.00115952, 0.00104649, 0.00030518)
-    I3 = (0.00082110, 0.00235762, 0.00168340)
-    I4 = (0.00039424, 0.00032191, 0.00010442)
+    sol = p.get('solref0', 0.002)
+    jd = p.get('j_damp', 0.0)
+    # modo visual: pega las mallas del CAD real y oculta la geometria abstracta
+    vis = p.get('vis', False) and all(
+        os.path.exists(f"{MESH_DIR}/vis_link{i}.obj") for i in (2, 3, 4))
+    a = "0" if vis else "1"          # alpha de la geometria abstracta
+    af = "0" if vis else "0.9"       # alpha del pie (contacto): invisible en modo visual
+    PLA = "0.55 0.62 0.78 1"         # color de las mallas impresas
+    asset = (f'<mesh name="v2" file="{MESH_DIR}/vis_link2.obj"/>'
+             f'<mesh name="v3" file="{MESH_DIR}/vis_link3.obj"/>'
+             f'<mesh name="v4" file="{MESH_DIR}/vis_link4.obj"/>') if vis else ""
+    g2 = f'<geom type="mesh" mesh="v2" rgba="{PLA}"/>' if vis else ""
+    g3 = f'<geom type="mesh" mesh="v3" rgba="{PLA}"/>' if vis else ""
+    g4 = f'<geom type="mesh" mesh="v4" rgba="{PLA}"/>' if vis else ""
     return f"""<mujoco model="hoppy">
   <compiler angle="radian" autolimits="true"/>
   <option timestep="0.001" integrator="implicitfast" gravity="0 0 -9.81"/>
+  <visual><global offwidth="1280" offheight="960"/></visual>
   <default>
     <joint damping="0"/><geom contype="0" conaffinity="0"/>
-    <default class="contact"><geom contype="1" conaffinity="1" solref="{p['solref0']} 1"
+    <default class="contact"><geom contype="1" conaffinity="1" solref="{sol} 1"
        solimp="0.95 0.99 0.001" friction="2.0 0.1 0.1"/></default>
   </default>
+  <asset>{asset}</asset>
   <worldbody>
-    <geom name="floor" class="contact" type="plane" size="3 3 0.1"/>
-    <geom name="post" type="cylinder" fromto="0 0 0 0 0 {p['post_h']}" size="0.02"/>
-    <body name="link1" pos="0 0 {p['post_h']}">
-      <joint name="theta1" type="hinge" axis="0 0 1" damping="{p['j_damp']}"/>
-      <inertial pos="0 0 0" mass="{M1}" diaginertia="{I1[0]} {I1[1]} {I1[2]}"/>
-      <geom type="box" size="0.02 0.02 0.02"/>
+    <geom name="floor" class="contact" type="plane" size="3 3 0.1" rgba="0.5 0.5 0.55 1"/>
+    <geom name="post" type="cylinder" fromto="0 0 0 0 0 {HB}" size="0.02" rgba="0.3 0.3 0.3 1"/>
+    <body name="link1" pos="0 0 {HB}">
+      <joint name="theta1" type="hinge" axis="0 0 1" damping="{jd}"/>
+      <inertial pos="{COM1[0]} {COM1[1]} {COM1[2]}" mass="{M1}"
+                diaginertia="{I1[0]} {I1[1]} {I1[2]}"/>
+      <geom type="box" size="0.025 0.025 0.025" rgba="0.4 0.4 0.4 {a}"/>
       <body name="link2" pos="0 0 0">
-        <joint name="theta2" type="hinge" axis="0 1 0" damping="{p['j_damp']}"/>
-        <inertial pos="-0.25 0 0" mass="0.15" diaginertia="0.002 0.05 0.05"/>
-        <geom type="cylinder" fromto="{p['cw_pos']} 0 0 {RBOOM} 0 0" size="0.008"/>
-        <body name="cuerpo_cadera" pos="{RBOOM} 0 0">
-          <inertial pos="0 0 0" mass="{p['body_hip']}" diaginertia="0.002 0.002 0.002"/>
-          <geom type="box" size="0.03 0.03 0.03"/>
+        <joint name="theta2" type="hinge" axis="0 1 0" damping="{jd}"/>
+        <inertial pos="{p.get('cw_x', 0.078)} {COM2_YZ[0]} {COM2_YZ[1]}" mass="{M2}"
+                  diaginertia="{I2[0]} {I2[1]} {I2[2]}"/>
+        <geom type="cylinder" fromto="-0.50 0 0 {LB} 0 0" size="0.009" rgba="0.6 0.6 0.6 {a}"/>
+        <geom type="cylinder" fromto="-0.50 -0.04 0 -0.50 0.04 0" size="0.06" rgba="0.7 0.2 0.2 {a}"/>
+        {g2}
+        <body name="cuerpo_cadera" pos="{LB} 0 0">
+          <inertial pos="0 0 0" mass="1e-6" diaginertia="1e-9 1e-9 1e-9"/>
+          <geom type="box" size="0.03 0.03 0.03" rgba="0.2 0.4 0.7 {a}"/>
         </body>
-        <body name="contrapeso" pos="{p['cw_pos']} 0 0">
-          <inertial pos="0 0 0" mass="{p['cw_mass']}" diaginertia="0.003 0.003 0.003"/>
-          <geom type="cylinder" fromto="0 -0.02 0 0 0.02 0" size="0.05"/>
-        </body>
-        <body name="link3" pos="{RBOOM} 0 0">
-          <joint name="theta3" type="hinge" axis="0 1 0" armature="{ARM_H}"/>
-          <inertial pos="0.048 0 0.077" mass="{M3}" diaginertia="{I3[0]} {I3[1]} {I3[2]}"/>
-          <geom type="capsule" fromto="0 0 0 0 0 -{L3}" size="0.012"/>
-          <body name="link4" pos="0 0 -{L3}">
-            <joint name="theta4" type="hinge" axis="0 1 0" armature="{ARM_K}"
-                   stiffness="{p['knee_stiff']}" springref="{p['spring_ref']}"/>
-            <inertial pos="0.002 0.021 0.145" mass="{M4}" diaginertia="{I4[0]} {I4[1]} {I4[2]}"/>
-            <geom type="capsule" fromto="0 0 0 0 0 -{L4}" size="0.010"/>
-            <geom name="foot" class="contact" type="sphere" pos="0 0 -{L4}" size="0.012"/>
-            <site name="foot_site" pos="0 0 -{L4}" size="0.005"/>
+        <body name="link3" pos="{LB} 0 0">
+          <joint name="theta3" type="hinge" axis="1 0 0" armature="{ARM_H}"
+                 range="0.2 2.2"/>
+          <inertial pos="{COM3[0]} {COM3[1]} {COM3[2]}" mass="{M3}"
+                    diaginertia="{I3[0]} {I3[1]} {I3[2]}"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -{LH}" size="0.012" rgba="0.2 0.5 0.8 {a}"/>
+          {g3}
+          <body name="link4" pos="0 0 -{LH}">
+            <joint name="theta4" type="hinge" axis="1 0 0" armature="{ARM_K}"
+                   stiffness="{p.get('knee_stiff', KNEE_STIFF)}" springref="{p.get('knee_ref', KNEE_REF)}" range="-2.8 -0.7"/>
+            <inertial pos="{COM4[0]} {COM4[1]} {COM4[2]}" mass="{M4}"
+                      diaginertia="{I4[0]} {I4[1]} {I4[2]}"/>
+            <geom type="capsule" fromto="0 0 0 0 0 -{LK}" size="0.010" rgba="0.2 0.6 0.9 {a}"/>
+            {g4}
+            <geom name="foot" class="contact" type="sphere" pos="0 0 -{LK}" size="0.012" rgba="0.9 0.6 0.1 {af}"/>
+            <site name="foot_site" pos="0 0 -{LK}" size="0.006"/>
           </body>
         </body>
       </body>
@@ -96,117 +162,3 @@ def make_xml(p):
     <motor name="knee" joint="theta4" gear="1" ctrlrange="-50 50"/>
   </actuator>
 </mujoco>"""
-
-
-def evaluate(user_params, t_total=6.0, return_log=False):
-    p = dict(DEFAULTS); p.update(user_params or {})
-    m = mujoco.MjModel.from_xml_string(make_xml(p))
-    d = mujoco.MjData(m)
-    jid = lambda n: mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_JOINT, n)
-    qa = {n: m.jnt_qposadr[jid(n)] for n in ["theta1", "theta2", "theta3", "theta4"]}
-    va = {n: m.jnt_dofadr[jid(n)] for n in ["theta1", "theta2", "theta3", "theta4"]}
-    dof34 = [va["theta3"], va["theta4"]]
-    hip_a = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_ACTUATOR, "hip")
-    knee_a = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_ACTUATOR, "knee")
-    fs = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "foot_site")
-    fg = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_GEOM, "foot")
-    hb = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "link3")
-    bb = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "cuerpo_cadera")
-
-    KPf = np.array([p['kp_x'], 0.0, p['kp_z']])
-    KDf = np.array([p['kd'], 0.0, p['kd']])
-
-    def foot_rel_hip():
-        R = d.xmat[hb].reshape(3, 3)
-        return R.T @ (d.site_xpos[fs] - d.xpos[hb])
-
-    def foot_jac():
-        J = np.zeros((3, m.nv)); mujoco.mj_jacSite(m, d, J, None, fs)
-        return J[:, dof34]
-
-    def foot_force():
-        f = 0.0
-        for k in range(d.ncon):
-            c = d.contact[k]
-            if fg in (c.geom1, c.geom2):
-                f6 = np.zeros(6); mujoco.mj_contactForce(m, d, k, f6); f += f6[0]
-        return f
-
-    d.qpos[qa["theta3"]], d.qpos[qa["theta4"]] = p['q3_ref'], p['q4_ref']
-    mujoco.mj_forward(m, d)
-    p_ref = foot_rel_hip().copy() + np.array([p['pref_dx'], 0.0, p['pref_dz']])
-
-    qd_filt = np.zeros(2); q_prev = None
-    phase = "stance"; t_td = 0.0; t_lo = -1.0
-    apexes = []; cur_apex = -9.9
-    body_z_log = []; t = 0.0
-    nstep = int(t_total / DT)
-    crashed = False
-    for step in range(nstep):
-        qd_real = np.array([d.qvel[dof34[0]], d.qvel[dof34[1]]])
-        q = np.array([d.qpos[qa["theta3"]], d.qpos[qa["theta4"]]])
-        if q_prev is None: q_prev = q.copy()
-        a = p_ref  # placeholder
-        raw = (q - q_prev) / DT
-        af = 10.0 * DT / (1 + 10.0 * DT)
-        qd_filt = qd_filt + af * (raw - qd_filt); q_prev = q.copy()
-        Jc = foot_jac()
-        R = d.xmat[hb].reshape(3, 3)
-        err = R @ (p_ref - foot_rel_hip())
-        Fair = KPf * err - KDf * (Jc @ qd_filt)
-        tau_air = Jc.T @ Fair
-        s = (t - t_td) / p['tst'] if phase == "stance" else 0.0
-        Fz = bezier(FZ_BZ, s) * p['fz_scale']
-        Fx = bezier(FX_BZ, s) * p['fx_scale']
-        tau_st = Jc.T @ np.array([Fx, 0.0, -Fz])
-        Vair = (Rw / (kT * N)) * tau_air + kv * N * qd_filt
-        Vst = (Rw / (kT * N)) * tau_st + kv * N * qd_filt
-        if phase == "stance":
-            al = min(1.0, (t - t_td) / p['blend']); V = al * Vst + (1 - al) * Vair
-        else:
-            V = Vair
-        V = np.clip(V, -VMAX, VMAX)
-        i = np.clip((V - kv * N * qd_real) / Rw, -IMAX, IMAX)
-        tau = kT * N * i
-        d.ctrl[hip_a], d.ctrl[knee_a] = tau
-
-        bz = d.xpos[bb][2]; body_z_log.append(bz)
-        fz_site = d.site_xpos[fs][2]
-        contact = (fz_site <= 0.014) or (foot_force() > 1.0)
-        # FSM robusta: apoyo empuja hasta despegar o agotar tst; aereo sostiene
-        # postura y reentra a apoyo al tocar (con debounce para no castanetear).
-        if phase == "stance":
-            if (t - t_td) >= p['tst'] or fz_site > 0.02:
-                phase = "aerial"; t_lo = t; cur_apex = bz
-        else:  # aerial
-            cur_apex = max(cur_apex, bz)
-            if contact and (t - t_lo) > 0.03:
-                phase = "stance"; t_td = t
-                apexes.append(cur_apex)
-        mujoco.mj_step(m, d); t += DT
-        if np.any(np.isnan(d.qpos)) or bz < -0.10:
-            crashed = True; break
-
-    body_z = np.array(body_z_log)
-    apexes = np.array(apexes)
-    n_hops = len(apexes)
-    # score: saltos sostenidos, premiando consistencia, penalizando crash
-    if n_hops >= 2 and not crashed:
-        apex_std = float(np.std(apexes[1:])) if n_hops > 2 else 1.0
-        consistency = 1.0 / (1.0 + 20 * apex_std)
-        score = n_hops + 5 * consistency
-    else:
-        score = n_hops - (10 if crashed else 0)
-    res = dict(score=float(score), n_hops=int(n_hops), crashed=bool(crashed),
-               apex_mean=float(np.mean(apexes)) if n_hops else -9.9,
-               apex_std=float(np.std(apexes[1:])) if n_hops > 2 else 9.9,
-               body_z_min=float(body_z.min()), body_z_max=float(body_z.max()),
-               t_end=float(t))
-    if return_log:
-        res["body_z"] = body_z.tolist()
-    return res
-
-
-if __name__ == "__main__":
-    params = json.loads(sys.argv[1]) if len(sys.argv) > 1 else {}
-    print(json.dumps(evaluate(params)))

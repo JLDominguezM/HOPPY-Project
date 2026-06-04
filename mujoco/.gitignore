@@ -1,0 +1,12 @@
+# artefactos pesados / generados (no versionar)
+meshes/
+*.glb
+__pycache__/
+*.bak
+best_honest.json
+# overlay CAD: en desarrollo, no parte del checkpoint estable
+figuras/salto_cad.mp4
+figuras/montaje_cad.png
+figuras/cad_*.png
+figuras/montaje.png
+figuras/montaje_avance.png

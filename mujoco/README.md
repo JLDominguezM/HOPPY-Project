@@ -1,48 +1,73 @@
 # Simulación de HOPPY en MuJoCo
 
 Simulación del robot saltarín HOPPY en MuJoCo, siguiendo la rúbrica del curso
-(Robots Humanoides). Replica la física del simulador de MATLAB: gantry pasivo +
-pierna activa, control híbrido a 1 kHz, contacto duro y dinámica de actuadores
-por voltaje.
+(Robots Humanoides). Replica el simulador de MATLAB (`../Simulator_MATLAB`):
+gantry pasivo + pierna activa, control híbrido a 1 kHz, contacto duro y dinámica
+de actuadores por voltaje. **El controlador es un port fiel del MATLAB** y el
+modelo está anclado a `get_params.m` (masas, inercias, geometría); el balance del
+boom se calibró para igualar el torque gravitacional `Ge` del MATLAB.
 
 ## Archivos
-- `hoppy.xml` — modelo MJCF (4 GDL, armature, resorte de rodilla, contrapeso, contacto duro).
-- `build_model.py` — generador parametrico del modelo + tuner de balance del gantry.
-- `control.py` — controlador híbrido (en construcción): FSM aéreo/apoyo, PD cartesiano, Bézier.
-- `figuras/` — gráficas y video de resultados.
+- `tune_eval.py` — modelo MJCF (`make_xml`) anclado a `get_params.m` + constantes físicas + Bézier.
+- `controller.py` — controlador híbrido compartido (`Hoppy`): FSM aéreo/apoyo, PD cartesiano en el frame del boom, Bézier, voltaje+back-EMF, velocidad filtrada.
+- `control.py` — corrida final + métricas + `figuras/resultados.png`.
+- `verify.py` — **suite de verificación rigurosa**: 12 chequeos PASS/FAIL + comparación vs MATLAB.
+- `render.py` / `view.py` — video (`figuras/salto.mp4`) y visor interactivo.
+- `export_ref.m` (en `../Simulator_MATLAB`) — vuelca la referencia a `ref_matlab.csv`.
+
+## Estado (verificado con `verify.py`)
+**Salta de verdad, de forma estable y avanza alrededor del poste** — los 12
+chequeos críticos pasan: fase de apoyo que CARGA (~27 N) y empuja, fase de vuelo
+real, el cuerpo sube 7.2 cm por el empuje (no por flotar), la pierna se mantiene
+doblada en el rango de la referencia (q4∈[−2.32,−1.92], sin config singular),
+**no aletea** (pie despega 1.2× la subida del cuerpo), gantry sin colapso, ciclo
+límite estable (apex std ≈ 4.5 mm), avanza ~1 rad/s alrededor del poste, V≤12 V, i≤12 A.
+
+### Comparación vs MATLAB (referencia)
+| Métrica | MuJoCo | MATLAB |
+|---|---|---|
+| Altura cadera mín (m) | 0.115 | 0.115 |
+| Altura cadera máx (m) | 0.187 | 0.187 |
+| Amplitud de salto (cm) | 7.2 | 7.2 |
+| Frecuencia (Hz) | 2.5 | 2.2 |
+| Fracción de apoyo (%) | 51 | 60 |
+| Pierna q4 mín (rad) | −2.32 | −2.27 |
+| Avance θ1 (gira el poste) | sí (~1.5 vueltas/10 s) | sí |
+| GRF pico (N) | 84 | 30 |
+
+Mismo gait (comprime → empuja → vuela → aterriza), **amplitud y rango de cadera
+idénticos** (0.115–0.187 m), pierna doblada igual, y **avanza alrededor del poste**
+como la referencia. Diferencias menores: frecuencia ~14 % mayor (2.5 vs 2.2 Hz) y
+fracción de apoyo algo menor. Ver `figuras/comparacion_matlab.png`. El config se
+halló con búsqueda multi-agente (`tune_metric`): score 99/100.
 
 ## Mapa a la rúbrica (100 pts)
-| Fase | Contenido | Pts | Estado |
-|---|---|---|---|
-| 1 | Cinemática + armature (N²·Ir) + resorte + contrapeso (XML) | 15 | ✅ |
-| 2 | Contacto duro (`solref`/`solimp`), sin rebote | 10 | ✅ |
-| 3 | Actuadores por voltaje + back-EMF (Ec.18), límites 12V/30A | 15 | ✅ (V≤12, I≤30 verificado) |
-| 4 | Control híbrido: FSM 1kHz, `Jc^T`, PD aéreo, Bézier stance, blending 10ms | 45 | ✅ **salto estable (~50 saltos)** |
-| 5 | Velocidad por derivada filtrada (λ≈10) + gráficas | 15 | ✅ |
+| Fase | Contenido | Estado |
+|---|---|---|
+| 1 | Cinemática + armature (N²·Ir) + resorte de rodilla + contrapeso (en link2) | ✅ |
+| 2 | Contacto duro (`solref`/`solimp`), sin rebote | ✅ |
+| 3 | Actuador por voltaje + back-EMF, límites 12 V/30 A | ✅ (V≤12, i≤12) |
+| 4 | Control híbrido: FSM 1 kHz, `Jc^T`, PD aéreo (Ec.17), Bézier (Ec.19), blending (Ec.20) | ✅ salto estable verificado |
+| 5 | Velocidad por derivada filtrada (λ≈10) + gráficas | ✅ |
 
-## Resultado
-Ciclo límite estable: ~46-60 saltos consistentes (apex std ≈ 0.016 m), sin colapso,
-voltaje y corriente dentro de límites. Ver `figuras/resultados.png` y `figuras/salto.mp4`.
+## Tuneo respecto al MATLAB (documentado)
+Para el sim2sim a MuJoCo se ajustaron, dentro de la estructura de la rúbrica:
+- **Eje de la pierna en X** (no Y): la pierna oscila en el plano tangencial para propulsar el avance alrededor del poste, igual que el MATLAB.
+- `cw_x=0.080`: CoM x de link2 calibrado para igualar `Ge(θ2)=−5.95 N·m` del MATLAB.
+- `kp_sw≈433` (vs 150 del MATLAB): mantiene la pierna retraída en vuelo; con 150 se descuelga al config singular.
+- `knee_stiff≈0.25` + `fz_scale≈1.58`: rebote lento de gran amplitud (iguala los 7.2 cm / ~2.5 Hz).
+- `j_damp≈0.29`, `solref0≈0.013`, `Tst≈0.234`, `krh≈0.094`: disipación, contacto y avance afinados.
+- Topes de rodilla (q4∈[−2.8,−0.7]) como red de seguridad (no activos en el gait).
 
-Parámetros afinados (en `control.py`): `j_damp=0.2, fz_scale=1.4, cw_mass=1.9,
-tst=0.12, knee_stiff=5.0`. El amortiguamiento de las juntas pasivas del gantry
-(fricción de rodamientos) y una FSM con reentrada robusta fueron clave para el
-ciclo límite estable.
-
-## Flujo
-- `tune_eval.py` — modelo parametrizado + `evaluate(params)` (harness de tuning).
-- `sweep.py` — barrido numérico paralelo de parámetros.
-- `control.py` — corrida final con los parámetros afinados + genera `figuras/resultados.png`.
-- `render.py` — genera el video `figuras/salto.mp4` (backend EGL).
-
-## Parámetros (de get_params.m y la guía técnica)
-- Reducciones: NH=26.9, NK=28.8; inercia rotor Ir=7e-6 → armature=N²·Ir.
-- Motor: Rw=1.3 Ω, kT=0.0135, kv=0.0186; límites Vmax=12 V, Imax=30 A.
-- Largos: Rboom=0.556, muslo=0.096, pantorrilla=0.1545 m.
+Los valores finales (en `tune_eval.DEFAULTS`) se hallaron por búsqueda multi-agente
+con `tune_metric` (verify + distancia a la referencia), llegando a score 99/100.
 
 ## Uso
 ```bash
-pip install mujoco numpy scipy matplotlib
-python3 build_model.py    # tuner de balance
-python3 control.py        # correr la simulación (cuando esté listo)
+pip install mujoco numpy scipy matplotlib imageio imageio-ffmpeg
+python3 control.py                 # corrida + figuras/resultados.png
+python3 verify.py                  # suite de verificación (PASS/FAIL + vs MATLAB)
+MUJOCO_GL=egl python3 render.py    # video figuras/salto.mp4
+python3 view.py                    # visor interactivo en vivo
+# referencia MATLAB: cd ../Simulator_MATLAB && matlab -batch "export_ref"
 ```
