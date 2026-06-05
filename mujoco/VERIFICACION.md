@@ -29,7 +29,7 @@
 | 2 | Contacto duro solref/solimp | `twin.py` líneas 217–218 | `twin_check.py` §4 |
 | 3 | Voltaje + back-EMF + límites | `controller.py` líneas 133–136 | `verify.py` chequeo V/I |
 | 4 | FSM 1 kHz + Jc^T + Bézier + blending | `controller.py` líneas 110–127 | `verify.py` saltos+GRF |
-| 5 | Velocidad filtrada λ=10 (no qvel directo) | `controller.py` líneas 94–95 | `figuras/encoder_signals.png` |
+| 5 | Velocidad filtrada λ=10 (no qvel directo) | `controller.py` líneas 94–95 | `python3 mujoco/plot_signals.py → figuras/señales_rubrica.png` |
 
 ## Nota técnica: umbrales de verify.py por modelo
 
