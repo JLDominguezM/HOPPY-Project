@@ -27,10 +27,10 @@ def main():
     d.qpos[h.qadr["theta4"]] = Q4
     mujoco.mj_forward(h.m, d)
     with mujoco.viewer.launch_passive(h.m, d) as viewer:
-        viewer.cam.lookat[:] = [0.58, 0.12, 0.12]   # centra el housing+pierna (cadera real)
-        viewer.cam.distance = 1.1
-        viewer.cam.azimuth = 35
-        viewer.cam.elevation = -12
+        viewer.cam.lookat[:] = [0.36, 0.05, 0.13]   # encuadra el robot COMPLETO (base -> pierna)
+        viewer.cam.distance = 1.55
+        viewer.cam.azimuth = 52
+        viewer.cam.elevation = -13
         # congelado: NO se llama mj_step, solo se sincroniza (sin salto, sin gravedad)
         while viewer.is_running():
             mujoco.mj_forward(h.m, d)

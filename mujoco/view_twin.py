@@ -2,8 +2,9 @@
 
 Modelo estructural real (gantry+boom+housing + pierna 4-barras del CAD, la MISMA malla
 detallada del view_twin_static, dims/masas medidas), con la marcha afinada al angulo del
-paper. La camara sigue al hoppy mientras AVANZA alrededor del poste; gira/zoom con el mouse
-(tecla 'w' = wireframe). Uso:  python3 view_twin.py
+paper. La camara queda FIJA y amplia para ver el robot completo (base+poste+boom+hoppy)
+mientras AVANZA alrededor del poste; gira/zoom con el mouse (tecla 'w' = wireframe).
+Uso:  python3 view_twin.py
 
 La pierna es PROCEDURAL gris detallada (placas IMP-8/9 + tubo TUB-1 + regaton, color housing)
 que SIEMPRE articula conectada (la malla CAD 4-barras se parte porque las placas cruzan la
@@ -28,14 +29,16 @@ def main():
     # se parte en la rodilla porque las placas cruzan la junta; va en view_twin_static.)
     h = Hoppy(dict(twin.DEFAULTS, vis=True, leg_proc=True), mdl=twin)
     with mujoco.viewer.launch_passive(h.m, h.d) as viewer:
-        viewer.cam.distance = 1.3
-        viewer.cam.elevation = -14
-        viewer.cam.azimuth = 70
+        # camara FIJA y amplia: encuadra el rig completo (base + poste + boom + hoppy
+        # circulando). Antes seguia a la cadera (lookat = xpos[bframe]), lo que dejaba la
+        # base fuera de cuadro y peleaba con el paneo del mouse. Usa el mouse para girar/zoom.
+        viewer.cam.lookat[:] = [0.10, 0.0, 0.18]
+        viewer.cam.distance = 2.2
+        viewer.cam.azimuth = 50
+        viewer.cam.elevation = -16
         while viewer.is_running():
             t0 = time.time()
             h.step()
-            # seguir al hoppy (centra la camara en la cadera; tu controlas angulo/zoom)
-            viewer.cam.lookat[:] = h.d.xpos[h.bframe]
             viewer.sync()
             if np.any(np.isnan(h.d.qpos)):
                 h.reset()
