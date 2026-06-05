@@ -79,6 +79,9 @@ DEFAULTS = dict(
     fz_scale=1.576776, fx_scale=1.0,
     # blending (Ec.20) y FSM
     blend=0.015719, grf_liftoff=2.290694,
+    # SOLO visual (modo vis): offset en X de la pierna para sacarla a la cara exterior
+    # del housing (como en el robot real) y que no quede tapada. No afecta la fisica.
+    legx=0.17,
 )
 
 
@@ -92,21 +95,72 @@ import os
 MESH_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "meshes")
 
 
+def gantry_xml(p):
+    """Estructura FIJA del gantry, modelada para parecerse al robot real (PPTX slide 4):
+    base octagonal en el piso -> torre del balero de YAW (delta2=theta1, placas con
+    tornillos) -> y arriba, a z=HB, el balero de PITCH (delta1=theta2) por donde pasa
+    el boom. El bloque del balero de pitch va en link1 (gira en yaw con el boom), aqui
+    NO; este modulo solo dibuja la parte FIJA (base + torre)."""
+    if not p.get('gantry', False):
+        return f'<geom name="post" type="cylinder" fromto="0 0 0 0 0 {HB}" size="0.02" rgba="0.3 0.3 0.3 1"/>'
+    W = "0.82 0.83 0.86 1"                       # PLA claro impreso
+    # base octagonal (aprox. con cilindro) apoyada en el piso
+    base = f'<geom name="post" type="cylinder" pos="0 0 0.005" size="0.085 0.005" rgba="{W}"/>'
+    # torre de yaw: dos placas laterales (las de los tornillos) + placa trasera
+    zt0, zt1 = 0.010, HB - 0.030                 # de la base hasta justo bajo el balero
+    zc, zh = (zt0 + zt1) / 2, (zt1 - zt0) / 2
+    sides = "".join(f'<geom type="box" pos="0 {sy*0.045} {zc}" size="0.026 0.004 {zh}" rgba="{W}"/>'
+                    for sy in (-1, 1))
+    back = f'<geom type="box" pos="-0.028 0 {zc}" size="0.004 0.045 {zh}" rgba="{W}"/>'
+    shaft = f'<geom type="cylinder" pos="0 0 {zc}" size="0.012 {zh}" rgba="0.3 0.3 0.33 1"/>'  # eje yaw
+    return base + sides + back + shaft
+
+
 def make_xml(p):
     sol = p.get('solref0', 0.002)
     jd = p.get('j_damp', 0.0)
-    # modo visual: pega las mallas del CAD real y oculta la geometria abstracta
-    vis = p.get('vis', False) and all(
-        os.path.exists(f"{MESH_DIR}/vis_link{i}.obj") for i in (2, 3, 4))
+    # modo visual: pega la malla CAD del housing y oculta la geometria abstracta.
+    # La pierna (4 barras) NO se toma del CAD: ese mecanismo no mapea a los 2 eslabones
+    # seriales del modelo y al "desplegarlo" quedaba desperdigado; se dibuja procedural
+    # (barras planas estilo impreso + pie) que calza exacto con la cinematica.
+    vis = p.get('vis', False) and os.path.exists(f"{MESH_DIR}/vis_link2.obj")
     a = "0" if vis else "1"          # alpha de la geometria abstracta
     af = "0" if vis else "0.9"       # alpha del pie (contacto): invisible en modo visual
-    PLA = "0.55 0.62 0.78 1"         # color de las mallas impresas
-    asset = (f'<mesh name="v2" file="{MESH_DIR}/vis_link2.obj"/>'
-             f'<mesh name="v3" file="{MESH_DIR}/vis_link3.obj"/>'
-             f'<mesh name="v4" file="{MESH_DIR}/vis_link4.obj"/>') if vis else ""
+    PLA = "0.55 0.62 0.78 1"         # color de las piezas impresas
+    DK = "0.2 0.2 0.23 1"            # juntas/poleas/pie (oscuro)
+    asset = f'<mesh name="v2" file="{MESH_DIR}/vis_link2.obj"/>' if vis else ""
     g2 = f'<geom type="mesh" mesh="v2" rgba="{PLA}"/>' if vis else ""
-    g3 = f'<geom type="mesh" mesh="v3" rgba="{PLA}"/>' if vis else ""
-    g4 = f'<geom type="mesh" mesh="v4" rgba="{PLA}"/>' if vis else ""
+    # pierna procedural: muslo (hip->rodilla, -Z, swing en Y-Z) y pantorrilla (rodilla->pie)
+    # offset visual de la pierna a lo largo del eje X (eje de las juntas): la coloca en
+    # la cara exterior del housing (como en el robot real, donde cuelga del extremo
+    # outboard) para que no quede tapada. Como ambas juntas giran sobre X, este offset
+    # se preserva en todo el movimiento. Es solo visual; la fisica del pie no cambia.
+    lx = p.get('legx', 0.0)
+    LEG = "0.9 0.9 0.93 1"           # eslabones impresos blancos (contrastan con el housing)
+    if vis:
+        g3 = (f'<geom type="cylinder" fromto="{lx-0.024} 0 0 {lx+0.024} 0 0" size="0.018" rgba="{DK}"/>'  # polea/motor de cadera
+              f'<geom type="box" pos="{lx} 0 -{LH/2}" size="0.007 0.016 {LH/2}" rgba="{LEG}"/>'      # barra del muslo
+              f'<geom type="box" pos="{lx} 0.018 -{LH/2}" size="0.005 0.005 {LH/2}" rgba="{LEG}"/>') # 2da barra (pantografo)
+        g4 = (f'<geom type="cylinder" fromto="{lx-0.017} 0 0 {lx+0.017} 0 0" size="0.013" rgba="{DK}"/>'   # junta de rodilla
+              f'<geom type="box" pos="{lx} 0 -{LK/2}" size="0.006 0.012 {LK/2}" rgba="{LEG}"/>'      # barra de pantorrilla
+              f'<geom type="sphere" pos="{lx} 0 -{LK}" size="0.018" rgba="{DK}"/>')                  # pie de hule
+    else:
+        g3 = g4 = ""
+    # boom: en modo visual es el tubo de PVC blanco de 1" (OD ~33mm) que conecta el
+    # hoppy con el gantry; el sobrante hacia -x hace de balance (no hay contrapeso
+    # separado). En modo abstracto: varilla gris + disco rojo del balance.
+    if vis:
+        boom = f'<geom type="cylinder" fromto="-0.52 0 0 {LB} 0 0" size="0.0167" rgba="0.93 0.93 0.9 1"/>'
+    else:
+        boom = (f'<geom type="cylinder" fromto="-0.50 0 0 {LB} 0 0" size="0.009" rgba="0.6 0.6 0.6 {a}"/>'
+                f'<geom type="cylinder" fromto="-0.50 -0.04 0 -0.50 0.04 0" size="0.06" rgba="0.7 0.2 0.2 {a}"/>')
+    # balero de PITCH (delta1): bloque en link1, gira en yaw con el boom y queda
+    # nivelado en pitch; el boom (PVC) lo atraviesa. Lleva la mordaza negra arriba.
+    if vis:
+        g1 = ('<geom type="box" pos="0 0 0" size="0.021 0.05 0.02" rgba="0.82 0.83 0.86 1"/>'
+              '<geom type="box" pos="0 0 0.02" size="0.018 0.045 0.007" rgba="0.13 0.13 0.16 1"/>')
+    else:
+        g1 = f'<geom type="box" size="0.025 0.025 0.025" rgba="0.4 0.4 0.4 {a}"/>'
     return f"""<mujoco model="hoppy">
   <compiler angle="radian" autolimits="true"/>
   <option timestep="0.001" integrator="implicitfast" gravity="0 0 -9.81"/>
@@ -119,18 +173,17 @@ def make_xml(p):
   <asset>{asset}</asset>
   <worldbody>
     <geom name="floor" class="contact" type="plane" size="3 3 0.1" rgba="0.5 0.5 0.55 1"/>
-    <geom name="post" type="cylinder" fromto="0 0 0 0 0 {HB}" size="0.02" rgba="0.3 0.3 0.3 1"/>
+    {gantry_xml(p)}
     <body name="link1" pos="0 0 {HB}">
       <joint name="theta1" type="hinge" axis="0 0 1" damping="{jd}"/>
       <inertial pos="{COM1[0]} {COM1[1]} {COM1[2]}" mass="{M1}"
                 diaginertia="{I1[0]} {I1[1]} {I1[2]}"/>
-      <geom type="box" size="0.025 0.025 0.025" rgba="0.4 0.4 0.4 {a}"/>
+      {g1}
       <body name="link2" pos="0 0 0">
         <joint name="theta2" type="hinge" axis="0 1 0" damping="{jd}"/>
         <inertial pos="{p.get('cw_x', 0.078)} {COM2_YZ[0]} {COM2_YZ[1]}" mass="{M2}"
                   diaginertia="{I2[0]} {I2[1]} {I2[2]}"/>
-        <geom type="cylinder" fromto="-0.50 0 0 {LB} 0 0" size="0.009" rgba="0.6 0.6 0.6 {a}"/>
-        <geom type="cylinder" fromto="-0.50 -0.04 0 -0.50 0.04 0" size="0.06" rgba="0.7 0.2 0.2 {a}"/>
+        {boom}
         {g2}
         <body name="cuerpo_cadera" pos="{LB} 0 0">
           <inertial pos="0 0 0" mass="1e-6" diaginertia="1e-9 1e-9 1e-9"/>
