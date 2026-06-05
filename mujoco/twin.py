@@ -64,13 +64,20 @@ M_SHANK   = 0.100   # PLA pantorrilla + resortes + regaton
 M_YAW     = 0.060   # bracket del carro de yaw (estimado)
 
 # ---------------- actuador (goBILDA 0027, datasheet = get_params) ----------
-NH, NK = 26.9, 26.9
+NH, NK = 26.9, 28.8   # cadera NH=26.9, rodilla NK=28.8 (rubrica)
 Rw, kT, kv = 1.3, 0.0135, 0.0186
 VMAX = 12.0
 IMAX = 9.2          # corriente de stall del motor @12V (datasheet); el original usaba 30
 N = np.array([NH, NK])
 I_ROTOR = 7e-6
 ARM_H, ARM_K = NH**2 * I_ROTOR, NK**2 * I_ROTOR
+# Amortiguamiento equivalente: back-EMF reflejado al joint, d_eq = kT^2 * N^2 / Rw [Nm*s/rad].
+# El controlador feed-forward-compensa el back-EMF (tau~=u, fuente de par ideal); este damping
+# pasivo reintroduce la disipacion electrica real del motor geared (rubrica Fase 1).
+DAMP_FACTOR = 0.5   # 1.0 frena el salto a 1.3cm (FALLA); 0.5 -> 5.6cm PASS. Barrido: 0.60 es el
+                    # maximo con PASS pero al borde (0.65 colapsa a 1.6cm), por eso 0.5 (margen).
+DAMP_H = DAMP_FACTOR * kT**2 * NH**2 / Rw   # cadera
+DAMP_K = DAMP_FACTOR * kT**2 * NK**2 / Rw   # rodilla (NK=28.8)
 DT = 0.001
 RBOOM = float(np.hypot(LB, DB))   # radio real cadera->eje yaw (0.712), no solo LB
 
@@ -251,7 +258,7 @@ def make_xml(p):
           <geom type="box" size="0.03 0.03 0.03" rgba="0.2 0.4 0.7 {a}"/>
         </body>
         <body name="link3" pos="{LB} {DB} {HIP_DZ}">
-          <joint name="theta3" type="hinge" axis="1 0 0" armature="{ARM_H}" range="-0.5 0.9"/>
+          <joint name="theta3" type="hinge" axis="1 0 0" armature="{ARM_H}" damping="{DAMP_H}" range="-0.5 0.9"/>
           {_inertial(COM3, M3, I3)}
           <geom type="capsule" fromto="0 0 0 {KNEE_OFF[0]} {KNEE_OFF[1]} {KNEE_OFF[2]}" size="0.012" rgba="0.2 0.5 0.8 {a}"/>
           {g3}
@@ -260,7 +267,7 @@ def make_xml(p):
           <body name="link4" pos="{KNEE_OFF[0]} {KNEE_OFF[1]} {KNEE_OFF[2]}">
             <joint name="theta4" type="hinge" axis="1 0 0" armature="{ARM_K}"
                    stiffness="{p.get('knee_stiff', 0.0)}" springref="{p.get('knee_ref', 0.0)}"
-                   damping="{p.get('knee_damp', 0.02)}" range="-1.3 0.4"/>
+                   damping="{DAMP_K + p.get('knee_damp', 0.0)}" range="-1.3 0.4"/>
             {_inertial(COM4, M4, I4)}
             <geom type="capsule" fromto="0 0 0 {FOOT[0]} {FOOT[1]} {FOOT[2]}" size="0.010" rgba="0.2 0.6 0.9 {a}"/>
             {g4}
