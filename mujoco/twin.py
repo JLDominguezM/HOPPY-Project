@@ -202,7 +202,7 @@ def make_xml(p):
         g4 = (f'<geom type="mesh" mesh="msh" rgba="{PLA}"/>'
               f'<geom type="sphere" pos="{fx} {fy} {fz}" size="0.018" rgba="{RUB}"/>')                                  # regaton negro en FOOT
     elif vis:
-        PLAg = "0.80 0.82 0.85 1"     # tubo en gris (como el housing del CAD)
+        PLAg = "0.65 0.65 0.65 1"     # tubo gris medio (CAD)
         kx, ky, kz = KNEE_OFF; fx, fy, fz = FOOT
         # Pierna procedural que SIEMPRE articula conectada (la malla CAD se parte al doblar):
         # muslo (link3) = motor de cadera + 2 placas NEGRAS (IMP-8/9) + motor de rodilla (el
@@ -216,10 +216,12 @@ def make_xml(p):
               f'<geom type="cylinder" fromto="{kx-0.022:.4f} {ky} {kz} {kx+0.022:.4f} {ky} {kz}" size="0.020" rgba="{MOT}"/>')  # motor de rodilla (KNEE_OFF, en link3)
         g4 = (f'<geom type="cylinder" fromto="{-lat-0.0075:.4f} 0 0 {-lat+0.0075:.4f} 0 0" size="0.012" rgba="{BLK}"/>'   # rodamiento izq
               f'<geom type="cylinder" fromto="{ lat-0.0075:.4f} 0 0 { lat+0.0075:.4f} 0 0" size="0.012" rgba="{BLK}"/>'   # rodamiento der
-              f'<geom type="cylinder" fromto="0 0 0 {fx} {fy} {fz}" size="0.011" rgba="{PLAg}"/>'                         # tubo TUB-1 (gris)
-              f'<geom type="cylinder" fromto="{0.90*fx:.4f} {0.90*fy:.4f} {0.90*fz:.4f} {1.16*fx:.4f} {1.16*fy:.4f} {1.16*fz:.4f}" size="0.019" rgba="{RUB}"/>')  # regaton negro
+              f'<geom type="cylinder" fromto="0 0 0 {fx} {fy} {fz}" size="0.014" rgba="{PLAg}"/>'                         # tubo TUB-1 (gris)
+              f'<geom type="sphere" pos="{fx} {fy} {fz}" size="0.020" rgba="0.08 0.08 0.08 1"/>')                          # regaton (esfera negra)
     else:
         g3 = g4 = ""
+    # link1 (yaw): cilindro oscuro del pivote, visible solo en modo vis
+    g1 = f'<geom type="cylinder" fromto="0 0 -0.028 0 0 0.028" size="0.022" rgba="0.25 0.25 0.28 1"/>' if vis else ""
     return f"""<mujoco model="hoppy_twin">
   <compiler angle="radian" autolimits="true"/>
   <option timestep="0.001" integrator="implicitfast" gravity="0 0 -9.81"/>
@@ -237,6 +239,7 @@ def make_xml(p):
       <joint name="theta1" type="hinge" axis="0 0 1" damping="{jd}"/>
       {_inertial(COM1, M1, I1)}
       <geom type="box" size="0.03 0.03 0.025" rgba="0.4 0.4 0.4 {a}"/>
+      {g1}
       <body name="link2" pos="0 0 0">
         <joint name="theta2" type="hinge" axis="0 1 0" damping="{jd}"/>
         {_inertial(COM2, M2, I2)}
