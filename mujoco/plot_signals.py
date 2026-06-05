@@ -11,8 +11,10 @@ Sombra verde = fase de apoyo (sensor de contacto foot_touch > 2 N).
 Datos verificados contra el modelo compilado (no asumidos):
   - la velocidad filtrada vive en  Hoppy.qd_filt  (ndarray (2,), [hip=theta3, knee=theta4])
   - theta3 (cadera): indice 2 en qpos/qvel ;  theta4 (rodilla): indice 3
-  - NO existe un sensor llamado 'Fz'; el contacto se lee del sensor touch
-    'foot_touch' en sensordata[9] (fuerza normal de contacto ~ Fz sobre piso plano)
+  - NO existe un sensor llamado 'Fz'. El sensor touch 'foot_touch' (sensordata[9]) lee
+    0 N porque su zona (foot_site, size 0.004) no cubre la esfera de contacto del pie
+    (radio 0.016); por eso el apoyo se detecta con el GRF real (mj_contactForce, el mismo
+    que usa la FSM del controlador) via rec['grf'].
   - site del pie = 'foot_site'
 
 Hoppy.step() avanza control + fisica y devuelve el log de control_step (que incluye
@@ -24,7 +26,6 @@ Uso:  python3 plot_signals.py
 """
 import os
 import numpy as np
-import mujoco
 import matplotlib
 matplotlib.use("Agg")            # backend sin pantalla (solo guarda PNG)
 import matplotlib.pyplot as plt
@@ -44,8 +45,6 @@ def run():
     h = Hoppy(dict(twin.DEFAULTS), mdl=twin)
     DT = h.DT
     hip_v, knee_v = h.vadr["theta3"], h.vadr["theta4"]          # 2, 3 (verificado)
-    touch_adr = h.m.sensor_adr[
-        mujoco.mj_name2id(h.m, mujoco.mjtObj.mjOBJ_SENSOR, "foot_touch")]   # 9
 
     n = int(T_TOTAL / DT)
     keys = ("t", "q3", "q4", "raw_hip", "raw_knee", "filt_hip", "filt_knee",
@@ -55,7 +54,6 @@ def run():
         # estado en el instante de control (lo que control_step va a leer)
         raw_hip = h.d.qvel[hip_v]
         raw_knee = h.d.qvel[knee_v]
-        fz = h.d.sensordata[touch_adr]
         rec = h.step()                       # control_step (actualiza qd_filt) + mj_step
         log["t"].append(rec["t"])
         log["q3"].append(rec["q3"]);          log["q4"].append(rec["q4"])
@@ -63,7 +61,7 @@ def run():
         log["filt_hip"].append(h.qd_filt[0]); log["filt_knee"].append(h.qd_filt[1])
         log["V_hip"].append(rec["V3"]);       log["V_knee"].append(rec["V4"])
         log["i_hip"].append(rec["i3"]);       log["i_knee"].append(rec["i4"])
-        log["contact"].append(bool(fz > FZ_CONTACT))
+        log["contact"].append(bool(rec["grf"] > FZ_CONTACT))
         if np.any(np.isnan(h.d.qpos)):
             print("AVISO: NaN detectado, simulacion truncada")
             break
@@ -145,7 +143,7 @@ def main():
     hops = sum(1 for (i0, i1) in segs if (i1 - i0) * DT >= 0.01)   # apoyos > 10 ms
     print("V_max  = %.2f V" % v_max)
     print("I_max  = %.2f A" % i_max)
-    print("saltos detectados = %d  (fases de apoyo > 10 ms, sensor foot_touch > %.0f N)"
+    print("saltos detectados = %d  (fases de apoyo > 10 ms, GRF > %.0f N)"
           % (hops, FZ_CONTACT))
 
 
