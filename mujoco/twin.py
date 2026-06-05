@@ -154,6 +154,11 @@ def make_xml(p):
     a = "0" if vis else "1"
     af = "0" if vis else "0.9"
     PLA = "0.78 0.80 0.83 1"; DKc = "0.2 0.2 0.23 1"; PVC = "0.93 0.93 0.9 1"
+    HOUSING = "0.65 0.65 0.65 1"   # gris medio del CAD (Tarea A)
+    MOT = "0.2 0.2 0.2 1"          # motores goBILDA
+    GOLD = "0.8 0.7 0.1 1"         # resortes de tension (tendones)
+    BLK = "0.15 0.15 0.15 1"       # placas/eslabones negros
+    RUB = "0.1 0.1 0.1 1"          # regaton
     # leg_mesh: malla CAD 4-barras (para el ensamble estatico). leg_proc=True fuerza la
     # pierna procedural limpia (para el render del SALTO, donde el 4-barras se desconecta
     # al doblar; la dinamica es identica porque las mallas son solo visuales).
@@ -162,8 +167,9 @@ def make_xml(p):
     g_house = ""
     if vis:
         asset = (f'<mesh name="mg" file="{MESH_DIR}/twin_gantry.obj"/>'
-                 f'<mesh name="mh" file="{MESH_DIR}/twin_housing.obj"/>')
-        g_house = f'<geom type="mesh" mesh="mh" rgba="{PLA}"/>'
+                 f'<mesh name="mh" file="{MESH_DIR}/twin_housing.obj"/>'
+                 f'<material name="mat_housing" rgba="{HOUSING}" specular="0.6" shininess="0.5" reflectance="0.1"/>')
+        g_house = f'<geom type="mesh" mesh="mh" material="mat_housing"/>'
         if leg_mesh:
             asset += (f'<mesh name="mt" file="{MESH_DIR}/twin_thigh.obj"/>'
                       f'<mesh name="msh" file="{MESH_DIR}/twin_shank.obj"/>')
@@ -187,25 +193,31 @@ def make_xml(p):
         cw = ""
     # pierna en link3/link4: malla CAD real (4-barras) si existe, si no procedural
     if leg_mesh:
-        g3 = f'<geom type="mesh" mesh="mt" rgba="{PLA}"/>'
-        # el pie es el REGATON real (viene en la malla de la pantorrilla); el contacto
-        # fisico (geom "foot") va invisible en vis. No se dibuja esfera extra.
-        g4 = f'<geom type="mesh" mesh="msh" rgba="{PLA}"/>'
-    elif vis:
-        PLAg = "0.80 0.82 0.85 1"     # placas/tubo en GRIS (como el housing del CAD)
-        JT   = "0.30 0.30 0.33 1"     # ejes/juntas (gris oscuro)
-        RUB  = "0.09 0.09 0.09 1"     # regaton de goma (negro)
         kx, ky, kz = KNEE_OFF; fx, fy, fz = FOOT
-        # Pierna procedural DETALLADA en gris (look HOPPY) que SIEMPRE articula conectada:
-        # muslo = eje de cadera + 2 placas paralelas (IMP-8/9) hip->knee; pantorrilla = eje de
-        # rodilla + TUBO (TUB-1) knee->foot + regaton. El RESORTE es el TENDON dorado (no se
-        # dibuja aqui). Es la pierna del view_twin (la malla CAD se parte por el 4-barras real).
-        g3 = (f'<geom type="cylinder" fromto="-0.032 0 0 0.032 0 0" size="0.017" rgba="{JT}"/>'                 # eje/motor de cadera
-              f'<geom type="capsule" fromto="-0.018 0 0 {-0.018+kx:.4f} {ky} {kz}" size="0.010" rgba="{PLAg}"/>' # placa IMP-8
-              f'<geom type="capsule" fromto=" 0.018 0 0 { 0.018+kx:.4f} {ky} {kz}" size="0.010" rgba="{PLAg}"/>')# placa IMP-9
-        g4 = (f'<geom type="cylinder" fromto="-0.026 0 0 0.026 0 0" size="0.014" rgba="{JT}"/>'                 # eje de rodilla
-              f'<geom type="cylinder" fromto="0 0 0 {fx} {fy} {fz}" size="0.011" rgba="{PLAg}"/>'               # tubo TUB-1
-              f'<geom type="cylinder" fromto="{0.90*fx:.4f} {0.90*fy:.4f} {0.90*fz:.4f} {1.16*fx:.4f} {1.16*fy:.4f} {1.16*fz:.4f}" size="0.019" rgba="{RUB}"/>')  # regaton (pie)
+        # malla CAD del muslo/pantorrilla (ya muestra el 4-barras) + 2 motores y el regaton.
+        # el contacto fisico (geom "foot") va invisible en vis; el regaton es solo visual.
+        g3 = (f'<geom type="mesh" mesh="mt" rgba="{PLA}"/>'
+              f'<geom type="cylinder" fromto="-0.02 0 0 0.02 0 0" size="0.045" rgba="{MOT}"/>'                          # motor cadera (en el hip)
+              f'<geom type="cylinder" fromto="{kx-0.02:.4f} {ky} {kz} {kx+0.02:.4f} {ky} {kz}" size="0.045" rgba="{MOT}"/>')  # motor rodilla (en KNEE_OFF)
+        g4 = (f'<geom type="mesh" mesh="msh" rgba="{PLA}"/>'
+              f'<geom type="sphere" pos="{fx} {fy} {fz}" size="0.018" rgba="{RUB}"/>')                                  # regaton negro en FOOT
+    elif vis:
+        PLAg = "0.80 0.82 0.85 1"     # tubo en gris (como el housing del CAD)
+        kx, ky, kz = KNEE_OFF; fx, fy, fz = FOOT
+        # Pierna procedural que SIEMPRE articula conectada (la malla CAD se parte al doblar):
+        # muslo (link3) = motor de cadera + 2 placas NEGRAS (IMP-8/9) + motor de rodilla (el
+        # motor de la rodilla va montado en el MUSLO/link3 aunque el joint theta4 este en link4,
+        # asi queda fijo al muslo al articular); pantorrilla (link4) = 2 rodamientos + tubo
+        # TUB-1 + regaton. El RESORTE es el TENDON dorado (en <tendon>, sigue la articulacion).
+        lat = 0.010                   # media-separacion lateral de las placas (0.02 total)
+        g3 = (f'<geom type="cylinder" fromto="-0.024 0 0 0.024 0 0" size="0.018" rgba="{MOT}"/>'                          # motor de cadera (hip)
+              f'<geom type="capsule" fromto="{-lat:.4f} 0 0 {-lat+kx:.4f} {ky} {kz}" size="0.007" rgba="{BLK}"/>'         # placa IMP-8 (negra)
+              f'<geom type="capsule" fromto="{ lat:.4f} 0 0 { lat+kx:.4f} {ky} {kz}" size="0.007" rgba="{BLK}"/>'         # placa IMP-9 (negra)
+              f'<geom type="cylinder" fromto="{kx-0.022:.4f} {ky} {kz} {kx+0.022:.4f} {ky} {kz}" size="0.020" rgba="{MOT}"/>')  # motor de rodilla (KNEE_OFF, en link3)
+        g4 = (f'<geom type="cylinder" fromto="{-lat-0.0075:.4f} 0 0 {-lat+0.0075:.4f} 0 0" size="0.012" rgba="{BLK}"/>'   # rodamiento izq
+              f'<geom type="cylinder" fromto="{ lat-0.0075:.4f} 0 0 { lat+0.0075:.4f} 0 0" size="0.012" rgba="{BLK}"/>'   # rodamiento der
+              f'<geom type="cylinder" fromto="0 0 0 {fx} {fy} {fz}" size="0.011" rgba="{PLAg}"/>'                         # tubo TUB-1 (gris)
+              f'<geom type="cylinder" fromto="{0.90*fx:.4f} {0.90*fy:.4f} {0.90*fz:.4f} {1.16*fx:.4f} {1.16*fy:.4f} {1.16*fz:.4f}" size="0.019" rgba="{RUB}"/>')  # regaton negro
     else:
         g3 = g4 = ""
     return f"""<mujoco model="hoppy_twin">
@@ -261,11 +273,11 @@ def make_xml(p):
   <tendon>
     <!-- 2 resortes de tension serie-elasticos (PDF): se estiran con theta4, dan el torque
          de extension de la rodilla. springlength="0 L0" = resorte de TENSION (solo jala). -->
-    <spatial name="spring_R" width="0.0045" rgba="0.86 0.73 0.32 1"
+    <spatial name="spring_R" width="0.005" rgba="0.8 0.7 0.1 1"
              stiffness="{KS_SPRING*p.get('spring_scale',1.0):.1f}" springlength="0 {L0_SPRING}">
       <site site="spr_a_R"/><site site="spr_b_R"/>
     </spatial>
-    <spatial name="spring_L" width="0.0045" rgba="0.86 0.73 0.32 1"
+    <spatial name="spring_L" width="0.005" rgba="0.8 0.7 0.1 1"
              stiffness="{KS_SPRING*p.get('spring_scale',1.0):.1f}" springlength="0 {L0_SPRING}">
       <site site="spr_a_L"/><site site="spr_b_L"/>
     </spatial>
