@@ -76,7 +76,7 @@ def make_xml(p):
         '<joint name="theta3" pos="0 0 0" axis="0 0 1" range="-0.5 0.9" actuatorfrcrange="-10 10"/>',
         '<joint name="theta3" pos="0 0 0" axis="0 0 1" range="-0.5 0.9" armature="%g" damping="%g"/>'
         % (ARM_H, DAMP_H))
-    foot = ('<site name="foot_site" pos="%g %g %g" size="0.01" rgba="1 0 0 1"/>'
+    foot = ('<site name="foot_site" pos="%g %g %g" size="0.03" rgba="1 0 0 1"/>'
             '<geom name="foot" class="contact" type="sphere" size="0.016" pos="%g %g %g" '
             'group="3" rgba="0.9 0.6 0.1 1"/>' % (fx, fy, fz, fx, fy, fz))
     xml = xml.replace(
@@ -91,11 +91,12 @@ def make_xml(p):
             'solimp="0.95 0.99 0.001" friction="2.0 0.1 0.1"/></default></default>' % sol)
     xml = re.sub(r'(<compiler[^>]*/>)', lambda mm: mm.group(1) + "\n  " + head, xml, count=1)
 
-    # 4) piso
+    # 4) piso (cuadricula: usa el material 'grid' inyectado al final; SOLO visual.
+    #    La fisica/friccion sigue en class="contact" -> intacta).
     xml = xml.replace(
         "<worldbody>",
         '<worldbody>\n    <geom name="floor" class="contact" type="plane" size="3 3 0.1" '
-        'rgba="0.5 0.5 0.55 1"/>', 1)
+        'material="grid"/>', 1)
 
     # 5) cuerpo_cadera (frame del boom en la cadera) como hijo de Link2, antes de Link3
     xml = xml.replace(
@@ -116,6 +117,17 @@ def make_xml(p):
     if p.get("fast"):
         xml = re.sub(r'<geom type="mesh"[^>]*/>', '', xml)
         xml = re.sub(r'<asset>.*?</asset>', '<asset/>', xml, flags=re.DOTALL)
+
+    # textura de cuadricula del piso (MuJoCo builtin checker). Se inyecta SIEMPRE -- tambien
+    # en modo fast, que vacia el <asset> -- para que el material 'grid' del floor exista. Es
+    # PURAMENTE visual: no toca contype/conaffinity/solref/friction (eso vive en class="contact").
+    grid = ('<texture name="grid" type="2d" builtin="checker" rgb1="0.18 0.22 0.28" '
+            'rgb2="0.28 0.33 0.40" width="512" height="512"/>'
+            '<material name="grid" texture="grid" texrepeat="4 4" texuniform="true" reflectance="0.2"/>')
+    if "<asset/>" in xml:
+        xml = xml.replace("<asset/>", "<asset>" + grid + "</asset>", 1)
+    elif "<asset>" in xml:
+        xml = xml.replace("<asset>", "<asset>" + grid, 1)
     return xml
 
 
