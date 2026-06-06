@@ -279,3 +279,98 @@ confiar en métricas que cuentan despegue del pie.**
 - **El reporte LaTeX** (`~/ImplementacionRobotica/reporte/*.tex`) va aparte y **NO se commitea**.
 - El correo del sistema `daniel-hinojosa09@outlook.com` es un ALIAS engañoso — el usuario es
   **José Luis Domínguez Morales** (A01285873@tec.mx). Nunca usar el alias para autoría.
+
+---
+
+## Sesión Jun 5-6 2026 — URDF Real + Salto Limpio
+
+### Lo que se hizo (en orden cronológico)
+
+1. **Auditoría contra rúbrica final** (Jun 5)
+   - NK corregido a 28.8 (rodilla), damping kT²N²/Rw añadido
+   - verify.py calibrado por modelo (IMAX dinámico, q4 no-crítico)
+   - Gráficas Fase 5 completadas (6 subplots: pos/vel/GRF/torques/FSM)
+
+2. **Mejora visual de la pierna procedural** (Jun 5)
+   - twin.py: 2 cápsulas negras paralelas (IMP-8/9), motores oscuros,
+     tubo gris TUB-1 r=0.014, regatón esfera negra, housing con malla CAD
+   - view_twin_static.py / view_twin.py: encuadre del robot completo
+
+3. **Importación del URDF real desde SolidWorks** (Jun 6)
+   - Plugin sw2urdf → HOPPY-E0-final.urdf exportado
+   - load_hoppy_urdf.py: decima mallas a meshes_mj/ (<60k caras)
+   - Joints renombrados theta1-4 para compatibilidad con controller.py
+   - Cinemática verificada con view_hoppy_manip.py (sliders por joint)
+   - Fix: knee vibraba → kp aumentado; yaw sin límites (es balero)
+
+4. **Primer intento: controller.py con el URDF** (Jun 6 madrugada)
+   - hoppy_urdf.py creado (análogo a twin.py para el URDF)
+   - view_hoppy_jump.py: viewer del URDF con controlador híbrido
+   - RESULTADO: 0.0 cm — el gait del twin no transfiere al URDF
+     (masas distintas: twin=2.58 kg vs URDF=3.43 kg, geometría real)
+   - Test mecánico: torque constante hip=−5/knee=+5 → +23.6 cm
+     → confirmó que el mecanismo SÍ puede saltar
+
+5. **Controlador propio del URDF: hop_controller.py** (Jun 6)
+   - FSM 3 estados: CARGA → EMPUJE → VUELO
+   - EMPUJE: torque directo hip=−TAU, knee=+TAU (signos del test mec.)
+   - hop_tune.py: random search 5 params, 300 iters
+   - RESULTADO v1: 18.8 cm — pero irreal (atravesaba piso 4 cm,
+     rodilla golpeaba límite −1.3, control bang-bang)
+
+6. **Diagnóstico y corrección del salto** (Jun 6)
+   - diagnostico_salto.png: 8 subplots (joints, pie, altura, GRF,
+     torques, FSM, velocidades, retrato de fase hip-knee)
+   - Fix: q4_crouch −1.156 → −0.85 (máximo limpio sin penetración)
+   - Fix: TAU 5.0 → 3.5 Nm, T_vuelo_min=0.08 s (anti bang-bang)
+   - Penalización en hop_tune: fitness -= 50*|Link4_z| si Link4 < 0
+   - Barrido q4_crouch: cliff en −0.90 (penetra), óptimo en −0.85
+   - RESULTADO FINAL: 11.1 cm limpio (excursión del cuerpo; pie despega
+     ~3.8 cm), Link4_min=+0.115 m, 0% penetración, rodilla sin golpear límite
+
+### Estado actual de los 3 modelos
+
+| Modelo | Salta | Altura | Controlador | Geometría |
+|---|---|---|---|---|
+| Abstracto (tune_eval) | ✅ | 7.2 cm | Híbrido rúbrica | Simplificada |
+| Gemelo CAD (twin.py) | ✅ | 8.8 cm | Híbrido rúbrica | CAD procedural |
+| URDF real (hoppy_urdf) | ✅ | 11.1 cm | FSM propio (hop_controller) | CAD SolidWorks real |
+
+> Las alturas son **excursión vertical del cuerpo** (pico − valle del ciclo). El despegue
+> real del pie sobre el piso es menor (URDF ≈ 3.8 cm, gemelo ≈ 6.3 cm) — ver §0.
+
+### Archivos clave añadidos esta sesión
+
+```
+mujoco/hoppy_urdf.py         — URDF como módulo compatible con controller.py
+mujoco/hop_controller.py     — FSM 3 estados para el URDF
+mujoco/hop_tune.py           — tuner random search con penalización física
+mujoco/view_hop_urdf.py      — viewer del URDF saltando
+mujoco/view_hoppy_manip.py   — viewer con sliders por joint
+mujoco/load_hoppy_urdf.py    — loader URDF→MuJoCo con decimación de mallas
+mujoco/HOPPY-E0-final/       — paquete URDF + meshes del SolidWorks
+figuras/hop_urdf_limpio.mp4  — video 10 s salto limpio
+figuras/hop_apex_lateral.png — render apex vista lateral
+figuras/hop_apex_34.png      — render apex vista 3/4
+figuras/diagnostico_salto.png — diagnóstico completo del ciclo
+figuras/señales_rubrica.png  — 6 subplots rúbrica Fase 5
+```
+
+### Discrepancias conocidas (pendientes o aceptadas)
+
+- spring_scale=0.0 en twin.py: resorte real desactivado, rebote por
+  knee_stiff (documentado en §3 anterior)
+- N_K twin: corregido a 28.8 esta sesión ✓
+- Masa link3 twin: 0.130 vs 0.656 kg PDF (motor agrupado en link2)
+- URDF: controlador propio (no el híbrido de la rúbrica) — el híbrido
+  no transfiere por diferencia de masas/geometría
+- q4 gemelo: opera en [-0.17, +0.46] (no singular por geometría 4-barras)
+  → chequeo no-crítico en verify.py (documentado)
+
+### Próximos pasos sugeridos
+
+1. Adaptar hop_controller al controlador híbrido de la rúbrica
+   (requiere re-afinar Jacobiano y Bézier para la geometría del URDF)
+2. Activar el resorte real (spring_scale=1.0) con un controlador
+   que lo aproveche
+3. Comparación cuantitativa sim vs robot físico cuando esté ensamblado

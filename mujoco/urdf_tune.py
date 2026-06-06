@@ -91,14 +91,20 @@ def evaluate(params):
         score -= apex_std * 2000.0                     # terciario: estabilidad
     if frac > 0.80:
         score -= 200.0                                 # no despega
+    pout = {k: float(params[k]) for k in RANGES}
+    pout["hip_gear"] = float(params.get("hip_gear", 1.0))
+    pout["knee_gear"] = float(params.get("knee_gear", 1.0))
     return dict(score=float(score), z_cm=rise * 100.0, n_saltos=n_saltos,
                 apex_std_mm=apex_std * 1000.0, grf_max=grf_max, frac_stance=round(frac, 3),
-                params={k: float(params[k]) for k in RANGES})
+                params=pout)
 
 
 def _sample(rng):
     p = dict(hoppy_urdf.DEFAULTS)
     p["fast"] = True                       # build sin mallas visuales (dinamica identica, carga rapida)
+    # el eje del knee del URDF esta invertido -> se busca tambien el SIGNO del actuador
+    p["hip_gear"] = float(rng.choice([-1.0, 1.0]))
+    p["knee_gear"] = float(rng.choice([-1.0, 1.0]))
     for k, (lo, hi) in RANGES.items():
         p[k] = float(rng.uniform(lo, hi))
     return p
