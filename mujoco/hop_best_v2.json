@@ -1,0 +1,12 @@
+{
+  "rise_cm": 8.77,
+  "vuelos": 21,
+  "score": 10.87,
+  "params": {
+    "TAU_HIP": 4.7836,
+    "TAU_KNEE": 4.984,
+    "T_crouch": 0.1252,
+    "T_push": 0.1234,
+    "q4_crouch": -0.6229
+  }
+}

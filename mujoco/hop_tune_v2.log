@@ -1,0 +1,36 @@
+iter   0: rise=7.6 cm  vuelos=18  score=9.4  {'TAU_HIP': 4.2502, 'TAU_KNEE': 4.7944, 'T_crouch': 0.2119, 'T_push': 0.0915, 'q4_crouch': -0.8799}
+iter   3: rise=8.7 cm  vuelos=17  score=10.4  {'TAU_HIP': 4.107, 'TAU_KNEE': 4.991, 'T_crouch': 0.2148, 'T_push': 0.1471, 'q4_crouch': -0.6044}
+iter  10: best rise=8.7 cm (score=10.4)
+iter  20: rise=8.5 cm  vuelos=20  score=10.5  {'TAU_HIP': 4.9343, 'TAU_KNEE': 4.3155, 'T_crouch': 0.1528, 'T_push': 0.1333, 'q4_crouch': -0.6509}
+iter  30: best rise=8.5 cm (score=10.5)
+iter  36: rise=8.9 cm  vuelos=17  score=10.6  {'TAU_HIP': 4.8267, 'TAU_KNEE': 4.6041, 'T_crouch': 0.2292, 'T_push': 0.1333, 'q4_crouch': -0.6337}
+iter  40: best rise=8.9 cm (score=10.6)
+iter  50: best rise=8.9 cm (score=10.6)
+iter  60: best rise=8.9 cm (score=10.6)
+iter  70: best rise=8.9 cm (score=10.6)
+iter  80: best rise=8.9 cm (score=10.6)
+iter  90: best rise=8.9 cm (score=10.6)
+iter 100: best rise=8.9 cm (score=10.6)
+iter 110: best rise=8.9 cm (score=10.6)
+iter 120: best rise=8.9 cm (score=10.6)
+iter 130: best rise=8.9 cm (score=10.6)
+iter 140: best rise=8.9 cm (score=10.6)
+iter 149: rise=7.6 cm  vuelos=35  score=10.6  {'TAU_HIP': 3.6219, 'TAU_KNEE': 4.5628, 'T_crouch': 0.0822, 'T_push': 0.182, 'q4_crouch': -0.9351}
+iter 150: best rise=7.6 cm (score=10.6)
+iter 160: best rise=7.6 cm (score=10.6)
+iter 161: rise=8.8 cm  vuelos=21  score=10.9  {'TAU_HIP': 4.7836, 'TAU_KNEE': 4.984, 'T_crouch': 0.1252, 'T_push': 0.1234, 'q4_crouch': -0.6229}
+iter 170: best rise=8.8 cm (score=10.9)
+iter 180: best rise=8.8 cm (score=10.9)
+iter 190: best rise=8.8 cm (score=10.9)
+iter 200: best rise=8.8 cm (score=10.9)
+iter 210: best rise=8.8 cm (score=10.9)
+iter 220: best rise=8.8 cm (score=10.9)
+iter 230: best rise=8.8 cm (score=10.9)
+iter 240: best rise=8.8 cm (score=10.9)
+iter 250: best rise=8.8 cm (score=10.9)
+iter 260: best rise=8.8 cm (score=10.9)
+iter 270: best rise=8.8 cm (score=10.9)
+iter 280: best rise=8.8 cm (score=10.9)
+iter 290: best rise=8.8 cm (score=10.9)
+=== BEST: rise=8.8 cm  vuelos=21 -> hop_best_v2.json ===
+{'TAU_HIP': 4.7836, 'TAU_KNEE': 4.984, 'T_crouch': 0.1252, 'T_push': 0.1234, 'q4_crouch': -0.6229}

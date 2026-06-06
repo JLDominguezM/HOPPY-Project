@@ -29,7 +29,7 @@ HOP_DEFAULTS = dict(
     # crouch MENOS profundo (q4_crouch>=-1.0 evita el limite -1.3 y que Link4 atraviese el
     # piso) + TAU mas bajo y cadencia mas lenta (anti bang-bang) + T_vuelo_min (cadencia).
     T_crouch=0.141, T_push=0.192,
-    q3_crouch=0.65, q4_crouch=-0.80,
+    q3_crouch=0.65, q4_crouch=-0.85,        # barrido: mas profundo limpio (Link4_min=0.115>0, ~11 cm)
     q3_land=0.50, q4_land=-0.60,
     TAU_HIP=3.5, TAU_KNEE=3.5,
     kp_flight=80.0, kd_flight=2.0,
