@@ -26,12 +26,14 @@ CARGA, EMPUJE, VUELO = 0, 1, 2
 _NAME = {CARGA: "CARGA", EMPUJE: "EMPUJE", VUELO: "VUELO"}
 
 HOP_DEFAULTS = dict(
-    # afinados con hop_tune.py: el URDF real sube ~18 cm con vuelo sostenido
-    T_crouch=0.091, T_push=0.162,
-    q3_crouch=0.65, q4_crouch=-1.156,
+    # crouch MENOS profundo (q4_crouch>=-1.0 evita el limite -1.3 y que Link4 atraviese el
+    # piso) + TAU mas bajo y cadencia mas lenta (anti bang-bang) + T_vuelo_min (cadencia).
+    T_crouch=0.141, T_push=0.192,
+    q3_crouch=0.65, q4_crouch=-0.80,
     q3_land=0.50, q4_land=-0.60,
-    TAU_HIP=3.35, TAU_KNEE=3.78,
+    TAU_HIP=3.5, TAU_KNEE=3.5,
     kp_flight=80.0, kd_flight=2.0,
+    T_vuelo_min=0.08,                        # tiempo minimo en VUELO antes de re-cargar
     umbral_grf=5.0, umbral_liftoff=2.0, umbral_touchdown=5.0,
 )
 
@@ -94,7 +96,7 @@ class HopController:
                 self.t_state = 0.0
         else:  # VUELO
             tau_h, tau_k = self._pd(p["q3_land"], p["q4_land"])
-            if grf > p["umbral_touchdown"]:
+            if grf > p["umbral_touchdown"] and self.t_state > p.get("T_vuelo_min", 0.08):
                 self.state = CARGA
                 self.t_state = 0.0
         lim = self.ctrl_lim
