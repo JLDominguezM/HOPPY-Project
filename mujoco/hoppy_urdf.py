@@ -71,7 +71,7 @@ def make_xml(p):
         '<joint name="theta1" pos="0 0 0" axis="0 0 1" damping="%g"/>' % jd)
     xml = xml.replace(
         '<joint name="theta2" pos="0 0 0" axis="0 0 1" range="-0.5 0.5" actuatorfrcrange="-10 10"/>',
-        '<joint name="theta2" pos="0 0 0" axis="0 0 1" range="-0.5 0.5" damping="%g"/>' % jd)
+        '<joint name="theta2" pos="0 0 0" axis="0 0 1" range="-0.8 0.8" damping="%g"/>' % jd)
     xml = xml.replace(
         '<joint name="theta3" pos="0 0 0" axis="0 0 1" range="-0.5 0.9" actuatorfrcrange="-10 10"/>',
         '<joint name="theta3" pos="0 0 0" axis="0 0 1" range="-0.5 0.9" armature="%g" damping="%g"/>'
@@ -104,11 +104,12 @@ def make_xml(p):
         'mass="1e-6" diaginertia="1e-9 1e-9 1e-9"/></body>\n          <body name="Link3"' % HIP_POS_L2, 1)
 
     # 6) sensor de contacto + actuadores de torque
+    hg, kg = p.get("hip_gear", 1.0), p.get("knee_gear", 1.0)   # signo del actuador (eje knee del URDF invertido)
     xml = xml.replace(
         "</mujoco>",
         '<sensor><touch name="foot_touch" site="foot_site"/></sensor>'
-        '<actuator><motor name="hip" joint="theta3" gear="1" ctrlrange="-5 5"/>'
-        '<motor name="knee" joint="theta4" gear="1" ctrlrange="-5 5"/></actuator></mujoco>')
+        '<actuator><motor name="hip" joint="theta3" gear="%g" ctrlrange="-5 5"/>'
+        '<motor name="knee" joint="theta4" gear="%g" ctrlrange="-5 5"/></actuator></mujoco>' % (hg, kg))
 
     # modo rapido (tuner): quita las mallas VISUALES para cargar instantaneo. La dinamica
     # es IDENTICA: las inercias son explicitas en cada body y el contacto es la esfera 'foot'.
