@@ -1,0 +1,131 @@
+"""hoppy_urdf.py — el URDF real de HOPPY como modulo compatible con controller.py.
+
+Toma el URDF importado (load_hoppy_urdf), renombra los joints joint1..4 -> theta1..4
+(opcion B: asi controller.py los encuentra sin cambios) y le INYECTA lo que el control
+hibrido necesita y el URDF no trae:
+  - piso (clase "contact")
+  - geom 'foot' + site 'foot_site' en la PUNTA real del regaton de Link4 (medida)
+  - body 'cuerpo_cadera' = frame del boom (Link2) en la cadera, para el PD cartesiano
+  - actuadores de torque hip(theta3)/knee(theta4)
+  - resorte de rodilla, armaduras N^2*Ir y damping (back-EMF) como en twin
+  - opcion implicitfast (estable con contacto; twin usa esto, NO RK4)
+
+El frame es compatible: el eje de oscilacion de la pierna cae en X del frame del boom
+(verificado: R2.T @ eje = [-1,0,0]), que es lo que controller.py asume. Masas reales del
+URDF = 3.43 kg (vs 2.58 del twin) -> las ganancias de fuerza se escalan ~1.33 como primer
+guess; el gait fino se re-afina aparte.
+
+Reusa motores goBILDA + Bezier + constantes del twin. NO modifica controller.py,
+load_hoppy_urdf.py, twin.py ni verify.py.
+"""
+import os
+import re
+import numpy as np
+import mujoco
+
+import load_hoppy_urdf as L
+import twin
+# nombres que controller.py lee como atributos del modulo del modelo:
+from twin import (bezier, FZ_BZ, FX_BZ, NH, NK, Rw, kT, kv, VMAX, IMAX, N, DT,
+                  ARM_H, ARM_K, DAMP_H, DAMP_K)
+
+RBOOM = 0.661                              # cadera -> eje yaw del URDF (medido)
+FOOT_TIP = (0.0227, -0.1824, -0.0274)     # punta del regaton en Link4-local (medida)
+MASS_RATIO = 3.43 / 2.58                   # ~1.33  (URDF vs twin)
+HIP_POS_L2 = "-0.6585 0 0.0425"            # cadera en frame Link2 (pos de Link3 sin su quat)
+
+# DEFAULTS = twin escalando las ganancias de fuerza por la razon de masas (primer guess)
+DEFAULTS = dict(twin.DEFAULTS)
+for _k in ("kp_sw", "kd_sw", "kp_st", "kd_st", "fz_scale", "fx_scale", "knee_stiff"):
+    DEFAULTS[_k] = DEFAULTS[_k] * MASS_RATIO
+
+_BASE = None
+
+
+def _base_mjcf():
+    """MJCF base del URDF (cinematica + inercia + mallas), cacheado."""
+    global _BASE
+    if _BASE is None:
+        m0 = L.build()
+        path = os.path.join(L.PKG, "urdf", "HOPPY-E0-final.mjcf.xml")
+        mujoco.mj_saveLastXML(path, m0)
+        _BASE = open(path).read()
+    return _BASE
+
+
+def make_xml(p):
+    xml = _base_mjcf()
+    jd = p.get("j_damp", 0.0)
+    ks, kr = p.get("knee_stiff", 0.0), p.get("knee_ref", 0.0)
+    kdmp = DAMP_K + p.get("knee_damp", 0.0)
+    sol = p.get("solref0", 0.0191)
+    fx, fy, fz = FOOT_TIP
+
+    # 1) joint1..4 -> theta1..4
+    for i in (1, 2, 3, 4):
+        xml = xml.replace('name="joint%d"' % i, 'name="theta%d"' % i)
+
+    # 2) aumentar los joints (armadura, damping, resorte de rodilla)
+    xml = xml.replace(
+        '<joint name="theta1" pos="0 0 0" axis="0 0 1" actuatorfrcrange="-10 10"/>',
+        '<joint name="theta1" pos="0 0 0" axis="0 0 1" damping="%g"/>' % jd)
+    xml = xml.replace(
+        '<joint name="theta2" pos="0 0 0" axis="0 0 1" range="-0.5 0.5" actuatorfrcrange="-10 10"/>',
+        '<joint name="theta2" pos="0 0 0" axis="0 0 1" range="-0.5 0.5" damping="%g"/>' % jd)
+    xml = xml.replace(
+        '<joint name="theta3" pos="0 0 0" axis="0 0 1" range="-0.5 0.9" actuatorfrcrange="-10 10"/>',
+        '<joint name="theta3" pos="0 0 0" axis="0 0 1" range="-0.5 0.9" armature="%g" damping="%g"/>'
+        % (ARM_H, DAMP_H))
+    foot = ('<site name="foot_site" pos="%g %g %g" size="0.01" rgba="1 0 0 1"/>'
+            '<geom name="foot" class="contact" type="sphere" size="0.016" pos="%g %g %g" '
+            'group="3" rgba="0.9 0.6 0.1 1"/>' % (fx, fy, fz, fx, fy, fz))
+    xml = xml.replace(
+        '<joint name="theta4" pos="0 0 0" axis="0 0 -1" range="-1.3 0.4" actuatorfrcrange="-10 10"/>',
+        '<joint name="theta4" pos="0 0 0" axis="0 0 -1" range="-1.3 0.4" armature="%g" '
+        'stiffness="%g" springref="%g" damping="%g"/>' % (ARM_K, ks, kr, kdmp) + foot)
+
+    # 3) opcion + defaults de contacto (tras el <compiler/>); implicitfast por estabilidad
+    head = ('<option timestep="0.001" integrator="implicitfast" gravity="0 0 -9.81"/>'
+            '<default><geom contype="0" conaffinity="0"/>'
+            '<default class="contact"><geom contype="1" conaffinity="1" solref="%g 1" '
+            'solimp="0.95 0.99 0.001" friction="2.0 0.1 0.1"/></default></default>' % sol)
+    xml = re.sub(r'(<compiler[^>]*/>)', lambda mm: mm.group(1) + "\n  " + head, xml, count=1)
+
+    # 4) piso
+    xml = xml.replace(
+        "<worldbody>",
+        '<worldbody>\n    <geom name="floor" class="contact" type="plane" size="3 3 0.1" '
+        'rgba="0.5 0.5 0.55 1"/>', 1)
+
+    # 5) cuerpo_cadera (frame del boom en la cadera) como hijo de Link2, antes de Link3
+    xml = xml.replace(
+        '<body name="Link3"',
+        '<body name="cuerpo_cadera" pos="%s" quat="0 0 0.70711 0.70711"><inertial pos="0 0 0" '
+        'mass="1e-6" diaginertia="1e-9 1e-9 1e-9"/></body>\n          <body name="Link3"' % HIP_POS_L2, 1)
+
+    # 6) sensor de contacto + actuadores de torque
+    xml = xml.replace(
+        "</mujoco>",
+        '<sensor><touch name="foot_touch" site="foot_site"/></sensor>'
+        '<actuator><motor name="hip" joint="theta3" gear="1" ctrlrange="-5 5"/>'
+        '<motor name="knee" joint="theta4" gear="1" ctrlrange="-5 5"/></actuator></mujoco>')
+
+    # modo rapido (tuner): quita las mallas VISUALES para cargar instantaneo. La dinamica
+    # es IDENTICA: las inercias son explicitas en cada body y el contacto es la esfera 'foot'.
+    if p.get("fast"):
+        xml = re.sub(r'<geom type="mesh"[^>]*/>', '', xml)
+        xml = re.sub(r'<asset>.*?</asset>', '<asset/>', xml, flags=re.DOTALL)
+    return xml
+
+
+if __name__ == "__main__":
+    m = mujoco.MjModel.from_xml_string(make_xml(DEFAULTS))
+    print("compila OK | nq=%d nu=%d nsite=%d nsensor=%d ngeom=%d" %
+          (m.nq, m.nu, m.nsite, m.nsensor, m.ngeom))
+    for nm in ("theta1", "theta2", "theta3", "theta4", "foot_site", "foot", "cuerpo_cadera", "hip", "knee"):
+        for obj in (mujoco.mjtObj.mjOBJ_JOINT, mujoco.mjtObj.mjOBJ_SITE,
+                    mujoco.mjtObj.mjOBJ_GEOM, mujoco.mjtObj.mjOBJ_BODY, mujoco.mjtObj.mjOBJ_ACTUATOR):
+            if mujoco.mj_name2id(m, obj, nm) >= 0:
+                print("  OK existe:", nm); break
+        else:
+            print("  FALTA:", nm)
