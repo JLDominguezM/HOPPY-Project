@@ -76,7 +76,7 @@ def make_xml(p):
         '<joint name="theta3" pos="0 0 0" axis="0 0 1" range="-0.5 0.9" actuatorfrcrange="-10 10"/>',
         '<joint name="theta3" pos="0 0 0" axis="0 0 1" range="-0.5 0.9" armature="%g" damping="%g"/>'
         % (ARM_H, DAMP_H))
-    foot = ('<site name="foot_site" pos="%g %g %g" size="0.03" rgba="1 0 0 1"/>'
+    foot = ('<site name="foot_site" pos="%g %g %g" size="0.03" rgba="1 0 0 0"/>'
             '<geom name="foot" class="contact" type="sphere" size="0.016" pos="%g %g %g" '
             'group="3" rgba="0.9 0.6 0.1 1"/>' % (fx, fy, fz, fx, fy, fz))
     xml = xml.replace(
