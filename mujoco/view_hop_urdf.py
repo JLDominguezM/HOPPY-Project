@@ -40,23 +40,36 @@ def main():
         return
 
     from mujoco import viewer as mjv
+    DT = m.opt.timestep                 # 0.001 s
     last = 0.0
+    rec = None
+    t_sim = 0.0                         # tiempo de simulacion acumulado
+    t_wall = time.perf_counter()        # tiempo real al arrancar el loop
     with mjv.launch_passive(m, d) as v:
         v.cam.lookat[:] = [0.0, 0.0, 0.25]
         v.cam.distance, v.cam.azimuth, v.cam.elevation = 2.4, 50, -16
         while v.is_running():
-            t0 = time.time()
-            rec = h.step()
-            mujoco.mj_step(m, d)
-            v.sync()
-            if np.any(np.isnan(d.qpos)):
-                h.reset()
-            if h.t - last >= 1.0:
+            # catchup: avanza la fisica hasta alcanzar el tiempo real transcurrido.
+            # cap de 5 pasos/frame: si el render se atrasa, recupera en frames
+            # siguientes en vez de congelarse intentando todo de golpe.
+            t_sim_target = time.perf_counter() - t_wall
+            pasos = 0
+            while t_sim < t_sim_target and pasos < 5:
+                rec = h.step()
+                mujoco.mj_step(m, d)
+                if np.any(np.isnan(d.qpos)):
+                    h.reset()
+                t_sim += DT
+                pasos += 1
+            v.sync()                    # UNA vez por frame (no dentro del catchup)
+            if rec is not None and h.t - last >= 1.0:
                 last = h.t
-                print("t=%.1fs  estado=%-6s  hip_z=%.3f  grf=%.0f N" % (h.t, rec["estado"], d.xpos[hip][2], rec["grf"]))
-            dt = m.opt.timestep - (time.time() - t0)
-            if dt > 0:
-                time.sleep(dt)
+                print("t=%.1fs  estado=%-6s  hip_z=%.3f  grf=%.0f N"
+                      % (h.t, rec["estado"], d.xpos[hip][2], rec["grf"]))
+            # si la fisica va adelantada del reloj, espera hasta su instante real
+            dormir = (t_wall + t_sim) - time.perf_counter()
+            if dormir > 0:
+                time.sleep(dormir)
 
 
 if __name__ == "__main__":
