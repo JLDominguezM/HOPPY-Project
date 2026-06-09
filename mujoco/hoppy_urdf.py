@@ -30,7 +30,7 @@ from twin import (bezier, FZ_BZ, FX_BZ, NH, NK, Rw, kT, kv, VMAX, IMAX, N, DT,
                   ARM_H, ARM_K, DAMP_H, DAMP_K)
 
 RBOOM = 0.661                              # cadera -> eje yaw del URDF (medido)
-FOOT_TIP = (0.0227, -0.1824, -0.0274)     # punta del regaton en Link4-local (medida)
+FOOT_TIP = (0.0227, -0.1824, -0.0274)     # regaton al final del shank en Link4-local (medida)
 MASS_RATIO = 3.43 / 2.58                   # ~1.33  (URDF vs twin)
 HIP_POS_L2 = "-0.6585 0 0.0425"            # cadera en frame Link2 (pos de Link3 sin su quat)
 
@@ -38,6 +38,34 @@ HIP_POS_L2 = "-0.6585 0 0.0425"            # cadera en frame Link2 (pos de Link3
 DEFAULTS = dict(twin.DEFAULTS)
 for _k in ("kp_sw", "kd_sw", "kp_st", "kd_st", "fz_scale", "fx_scale", "knee_stiff"):
     DEFAULTS[_k] = DEFAULTS[_k] * MASS_RATIO
+
+# ---------------------------------------------------------------------------------------
+# FORWARD: controlador HIBRIDO REAL (controller.py = port fiel del MATLAB/paper) con las
+# CONSTANTES REALES del simulador MATLAB + boom BALANCEADO con contrapeso (como el HOPPY
+# del paper; el modelo MATLAB lleva el CoM del boom en rx2=-0.50). Es el control que correra
+# en la LaunchPad F28379D (cpu01_main), NO el FSM tonto de hop_controller.
+#
+# Resultado: el URDF salta hacia ADELANTE = -theta1 (lado OPUESTO al offset de la pierna,
+# el "lado sin pierna"), ~0.58 rad/s, pie despega ~7.6 cm, 66% vuelo, ciclo limite estable,
+# V<=12 / i<=9.2 A (igual que el MATLAB). El sentido lo fija el empuje tangencial del apoyo
+# (GRF Bezier Fx pico=-25, el valor real del MATLAB); coincide con el sentido del MATLAB.
+#
+# Constantes reales (= get_params.m / firmware cpu01_main):
+#   kp_sw=150, kd_sw=5  (PD cartesiano aereo; firmware Kp_a/Kd_a)
+#   krh=0.10            (colocacion de pie Raibert)        p_toe_z=-0.15 (pie 15 cm bajo cadera)
+#   Tst=0.35           (tiempo de apoyo nominal)           grf_liftoff=1.5 (umbral de despegue)
+#   Fz_bz pico=100, Fx_bz pico=-25 (perfil GRF Bezier del apoyo)  kp_st=0.03 kd_st=0.08 (PD suave)
+#   modelo de motor goBILDA: Rw=1.3 kT=0.0135 kv=0.0186 Nh=26.9 Nk=28.8, sat 12 V / 9.2 A
+FORWARD = dict(
+    DEFAULTS,
+    kp_sw=150.0, kd_sw=5.0, krh=0.10, p_toe_z=-0.18, Tst=0.35,  # p_toe_z=-0.18: aterriza mas extendida (pierna mas vertical)
+    kp_st=0.03, kd_st=0.08, fz_scale=1.0, fx_scale=1.0, grf_liftoff=1.5,
+    q3_ref=0.55, q4_ref=-0.95,        # cuclilla valida en el espacio de juntas del URDF
+    cw_mass=2.86, cw_x=0.35,          # contrapeso: brazo REAL del boom fisico (35 cm del pivote),
+                                      # masa por BALANCE DE MOMENTOS al ~76% (deja peso efectivo
+                                      # en la pierna; el balance 100%=3.77 kg sobrelanza). Ver contrapeso.py
+    vx_d=0.0,                         # velocidad Raibert deseada = 0 (el MATLAB puro; Fx fija el avance)
+)
 
 _BASE = None
 
@@ -76,6 +104,8 @@ def make_xml(p):
         '<joint name="theta3" pos="0 0 0" axis="0 0 1" range="-0.5 0.9" actuatorfrcrange="-10 10"/>',
         '<joint name="theta3" pos="0 0 0" axis="0 0 1" range="-0.5 0.9" armature="%g" damping="%g"/>'
         % (ARM_H, DAMP_H))
+    # pie: la pierna se mantiene IGUAL que el URDF (malla del CAD). El contacto es el regaton
+    # al final del shank (FOOT_TIP). La fisica es un punto en esa punta.
     foot = ('<site name="foot_site" pos="%g %g %g" size="0.03" rgba="1 0 0 0"/>'
             '<geom name="foot" class="contact" type="sphere" size="0.016" pos="%g %g %g" '
             'group="3" rgba="0.9 0.6 0.1 1"/>' % (fx, fy, fz, fx, fy, fz))
@@ -98,10 +128,21 @@ def make_xml(p):
         '<worldbody>\n    <geom name="floor" class="contact" type="plane" size="3 3 0.1" '
         'material="grid"/>', 1)
 
-    # 5) cuerpo_cadera (frame del boom en la cadera) como hijo de Link2, antes de Link3
+    # 5) cuerpo_cadera (frame del boom en la cadera) como hijo de Link2, antes de Link3.
+    #    + CONTRAPESO opcional del boom: el HOPPY real (y el modelo MATLAB, rx2=-0.50) llevan
+    #    una masa en el lado OPUESTO al hopper (+x local de Link2) para balancear el pitch.
+    #    Sin el, el CoM del boom queda 0.55 m hacia el hopper (~13 N*m de gravedad) y el robot
+    #    solo bobea sin despegar. cw_mass/cw_x lo reproducen (faithful al diseno del paper).
+    cw_m, cw_x = p.get("cw_mass", 0.0), p.get("cw_x", 0.65)
+    cw = ""
+    if cw_m > 0:
+        cw = ('<body name="cw" pos="%g 0 0"><inertial pos="0 0 0" mass="%g" '
+              'diaginertia="%g %g %g"/><geom type="cylinder" fromto="-0.03 0 0 0.03 0 0" '
+              'size="%g" rgba="0.7 0.2 0.2 1"/></body>'
+              % (cw_x, cw_m, cw_m*0.002, cw_m*0.002, cw_m*0.002, 0.03+0.012*cw_m))
     xml = xml.replace(
         '<body name="Link3"',
-        '<body name="cuerpo_cadera" pos="%s" quat="0 0 0.70711 0.70711"><inertial pos="0 0 0" '
+        cw + '<body name="cuerpo_cadera" pos="%s" quat="0 0 0.70711 0.70711"><inertial pos="0 0 0" '
         'mass="1e-6" diaginertia="1e-9 1e-9 1e-9"/></body>\n          <body name="Link3"' % HIP_POS_L2, 1)
 
     # 6) sensor de contacto + actuadores de torque
