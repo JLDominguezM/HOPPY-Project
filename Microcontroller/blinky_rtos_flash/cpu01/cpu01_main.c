@@ -176,14 +176,40 @@ int posref1dir = 0; // TODO comment out later - just used in initial demo
 int posref2dir = 0; // TODO comment out later - just used in initial demo
 
 /****** PRUEBA LENTA DE LA PIERNA — sujetala en el aire ******/
-int   MOTORS_OFF = 0;            // 1 = solo verifica la IK (q_ref) sin mover; 0 = mueve la pierna
-float Kp_test[2] = {120.0, 120.0}; // P alto: asi el LIMITE (u_lim_test) es el que controla el torque
+int   MOTORS_OFF = 1;            // 1 = solo verifica la IK (q_ref) sin mover; 0 = mueve la pierna
+                                 // (arranca en 1 por seguridad: ponlo en 0 EN VIVO en Expressions)
+float Kp_test[2] = {400.0, 600.0}; // afinados en banco 2026-06-10: vencen la friccion (cadera) y el
+                                   // resorte (rodilla) con error <0.01 rad, sin oscilar
 float Kd_test[2] = {  0.0,   0.0}; // D = 0: sin zumbido (la derivada cruda es ruidosa)
 float u_lim_test = 4.0;          // limite de pseudo-pwm (de 10). Subelo en vivo si la rodilla no alcanza
 float ramp_rate  = 0.15;         // rad/s -> MUY lento (ya no se usa en el aereo)
-// AEREO: offset del cero a la convencion FK. El cero (tubo vertical) esta en (+beta,-beta) en FK
-// porque la rodilla no se extiende del todo. ~40 deg (0.70). AFINAR en vivo viendo el pie.
-float beta_off   = 0.70;
+// ===== MORFOLOGIA REAL DE LA PIERNA (aclarada 2026-06-10, ver HANDOFF_FIRMWARE.md) =====
+// La pierna es TIPO AVE (espejo del HOPPY original): la "rotula" apunta hacia ATRAS y
+// FLEXIONAR la rodilla (e mas negativo) manda el pie hacia ADELANTE (+x). Ademas el tubo
+// NUNCA queda alineado con el muslo: en el tope de extension ya va ~46 deg adelante.
+// POSE CERO (alcanzable y repetible): MUSLO VERTICAL (aplomar con telefono en las placas)
+// + rodilla en su TOPE DE EXTENSION (sin resorte peleando). Ahi se escriben QPOSCNT=0.
+// CADERA: +q0 = muslo hacia adelante. Offset del cero = 0 (muslo vertical EN el cero).
+float beta_off   = 0.0;
+// RODILLA — MAPA DEL 4-BARRAS:  q1_FK = KA*e^2 + KB*e + KC,  e = q_now[1] (encoder).
+// q1_FK = angulo efectivo rodilla->pie respecto al muslo, ADELANTE positivo. Flexionar
+// (e<0) AUMENTA q1_FK. |KA|,|KB| = forma medida en la calibracion de 4 puntos (la relacion
+// efectiva varia ~1.5 extension -> ~0.7 flexion); signo volteado por la morfologia espejo.
+// KC = q1_FK en el cero (~+0.80 = los ~46 deg del tubo + offset DK del pie): AFINAR con plomada.
+float KA = -0.454;
+float KB = -1.534;
+float KC = 0.80;
+float q_fk[2] = {0.0, 0.0};   // angulos FK REALES (para cinematica/Jacobiano); q_now queda en encoder
+// Trayectoria aerea, afinable EN VIVO (calculate_traj recalcula pos_des cada ms con ESTAS):
+float traj_amp   = 0.00;    // amplitud tangencial del barrido (m). 0 = pie QUIETO en traj_x0
+                            // (arranca en 0 = modo calibracion; sube a 0.05 EN VIVO para el barrido)
+float traj_x0    = 0.00;    // centro del barrido (m). + = adelante
+float traj_depth = -0.22;   // profundidad del pie bajo la cadera (m)
+long  traj_T     = 8000;    // periodo del ciclo (ms)
+// MODO JUNTA DIRECTA (calibracion): q_ref = q_test tal cual (unidades del ENCODER), sin IK.
+// Para medir la relacion efectiva del 4-barras de la rodilla con la cadera quieta.
+int   JOINT_MODE = 0;
+float q_test[2]  = {0.0, 0.0};
 float wp_hold    = 2.0;          // s en cada pose
 #define NWP 2
 float wp[NWP][2] = {
@@ -233,17 +259,29 @@ void calculate_traj(void)
      * as it only depends on the discrete time. This function will eventually determine the phase (aerial or stance)
      * and choose the correct position required for that time in that phase*/
 
+    // MODO JUNTA DIRECTA: objetivos de junta crudos (encoder), para calibrar el 4-barras.
+    if (JOINT_MODE) {
+        q_ref[0] = q_test[0];
+        q_ref[1] = q_test[1];
+        return;
+    }
+
     // AEREO: coloca el pie en pos_des (Cartesiano, frame de la cadera) via IK -> q_ref.
     // Ciclamos la posicion TANGENCIAL del pie adelante/atras (lento), a profundidad fija, para
-    // ver la colocacion de pie (lo que hace el control aereo en vuelo). pos_des es global:
-    // puedes cambiarlo EN VIVO en CCS para mover el pie a donde quieras.
-    float ang = (cnt % 8000) * (TWOPI / 8000.0);   // ciclo de 8 s
-    pos_des[0] =  0.05 * sin(ang);     // pie +-5 cm tangencial (adelante/atras)
-    pos_des[1] = -0.22;                // 22 cm bajo la cadera (profundidad)
+    // ver la colocacion de pie (lo que hace el control aereo en vuelo). Afinable EN VIVO via
+    // traj_amp / traj_x0 / traj_depth / traj_T (pos_des se recalcula cada ms, NO lo edites directo).
+    // traj_amp = 0 -> pie QUIETO en (traj_x0, traj_depth): el modo para calibrar beta_off.
+    float ang = (cnt % traj_T) * (TWOPI / (float)traj_T);
+    pos_des[0] = traj_x0 + traj_amp * sin(ang);   // tangencial (adelante/atras)
+    pos_des[1] = traj_depth;                      // profundidad bajo la cadera
 
     pose_to_joint_space();             // IK: pos_des -> q_ref (convencion FK: q=0 = pierna recta abajo)
-    q_ref[0] -= beta_off;              // pasar a la convencion del encoder (cero = tubo vertical)
-    q_ref[1] += beta_off;
+    q_ref[0] -= beta_off;              // cadera: FK -> encoder (offset calibrado = 0)
+    {   // rodilla: FK -> encoder = inversa del mapa del 4-barras (rama e<=0 con KA,KB<0)
+        float disc = KB*KB + 4.0f*KA*(q_ref[1] - KC);
+        if (disc < 0.0f) disc = 0.0f;  // objetivo mas flexionado que el alcance del mapa
+        q_ref[1] = (-KB - sqrt(disc))/(2.0f*KA);
+    }
 }
 
 void get_avg_vel(float raw_vel_h, float raw_vel_k)
@@ -281,18 +319,23 @@ void update_jacobian(void)
 {
     /*This function is given and will be useful when calculating anything in task space. This finds the jacobian*/
      // update jacobian
-    J[0][0] = LH*cos(q_now[0]) + LKF*cos(q_now[0] + q_now[1]);
-    J[0][1] = LKF*cos(q_now[0] + q_now[1]);
-    J[1][0] = LH*sin(q_now[0]) + LKF*sin(q_now[0] + q_now[1]);
-    J[1][1] = LKF*sin(q_now[0] + q_now[1]);
+    // Con los angulos FK REALES (q_fk), no los del encoder. OJO Etapa 2: para u=-J^T*F el torque
+    // de rodilla ademas se divide entre d(q1_FK)/de = 2*KA*e+KB (regla de la cadena del 4-barras).
+    J[0][0] = LH*cos(q_fk[0]) + LKF*cos(q_fk[0] + q_fk[1]);
+    J[0][1] = LKF*cos(q_fk[0] + q_fk[1]);
+    J[1][0] = LH*sin(q_fk[0]) + LKF*sin(q_fk[0] + q_fk[1]);
+    J[1][1] = LKF*sin(q_fk[0] + q_fk[1]);
 }
 void pose_to_joint_space(void)
 {
     //kinematics to get desired pose in joint space
     //calc after pos_des is found
+    //RAMA ESPEJO (pierna tipo ave): rodilla bombea ADELANTE -> muslo queda ATRAS de la
+    //linea cadera-pie (acos se RESTA) y la rodilla efectiva es POSITIVA. El original
+    //(rodilla humana) sumaba el acos y usaba -acos en la rodilla.
     LHF = sqrt(pos_des[0]*pos_des[0] + pos_des[1]*pos_des[1]);      //length hip to foot
-    q_ref[0] = (acos((LH*LH + LHF*LHF - LKF*LKF)/(2.*LH*LHF)) + atan2(pos_des[0],-pos_des[1]));
-    q_ref[1] = -acos((LHF*LHF - LH*LH - LKF*LKF)/(2.*LH*LKF));
+    q_ref[0] = (atan2(pos_des[0],-pos_des[1]) - acos((LH*LH + LHF*LHF - LKF*LKF)/(2.*LH*LHF)));
+    q_ref[1] = acos((LHF*LHF - LH*LH - LKF*LKF)/(2.*LH*LKF));
 }
 void update_states(void)
 {
@@ -318,12 +361,16 @@ void update_states(void)
     //update velocity in the finite horizon vel filter
     //get_avg_vel(raw_vel_h, raw_vel_k);
 
+    // angulos FK REALES: cadera = encoder + offset; rodilla = mapa del 4-barras
+    q_fk[0] = q_now[0] + beta_off;
+    q_fk[1] = KA*q_now[1]*q_now[1] + KB*q_now[1] + KC;
+
     // For stance controller
     update_jacobian();
 
     //get position in cartesian space
-    pos_now[0] =  LH*sin(q_now[0]) + LKF*sin(q_now[0] + q_now[1]);//Cartesian position
-    pos_now[1] = -LH*cos(q_now[0]) - LKF*cos(q_now[0] + q_now[1]);//from IK solve
+    pos_now[0] =  LH*sin(q_fk[0]) + LKF*sin(q_fk[0] + q_fk[1]);//Cartesian position
+    pos_now[1] = -LH*cos(q_fk[0]) - LKF*cos(q_fk[0] + q_fk[1]);//from IK solve
 
 }
 
