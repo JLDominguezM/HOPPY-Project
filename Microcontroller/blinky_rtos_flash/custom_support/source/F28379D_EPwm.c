@@ -125,7 +125,9 @@ void set_EPWM1A_VNH5019(float u)
         GpioDataRegs.GPASET.bit.GPIO2 = 1;
         GpioDataRegs.GPACLEAR.bit.GPIO3 = 1;
     }
-    pwmVal = abs(u) * (pwmCountMax / 10.0);
+    // BUG ARREGLADO (2026-06-11): era abs(u) = abs() de ENTEROS -> truncaba el float
+    // (|u|<1 daba 0% duty = zona muerta de 1.2 V, y el duty iba en escalones del 10%).
+    pwmVal = (u < 0 ? -u : u) * (pwmCountMax / 10.0);
 
     // set compareA compare value
     EPwm1Regs.CMPA.bit.CMPA = (int)pwmVal;
@@ -215,7 +217,9 @@ void set_EPWM1B_VNH5019(float u)
         GpioDataRegs.GPASET.bit.GPIO4 = 1;
         GpioDataRegs.GPACLEAR.bit.GPIO5 = 1;
     }
-    pwmVal = abs(u) * (pwmCountMax / 10.0);
+    // BUG ARREGLADO (2026-06-11): era abs(u) = abs() de ENTEROS -> truncaba el float
+    // (|u|<1 daba 0% duty = zona muerta de 1.2 V, y el duty iba en escalones del 10%).
+    pwmVal = (u < 0 ? -u : u) * (pwmCountMax / 10.0);
 
     // set compareB compare value
     EPwm1Regs.CMPB.bit.CMPB = (int)pwmVal;

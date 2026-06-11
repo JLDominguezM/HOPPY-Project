@@ -178,9 +178,22 @@ int posref2dir = 0; // TODO comment out later - just used in initial demo
 /****** PRUEBA LENTA DE LA PIERNA — sujetala en el aire ******/
 int   MOTORS_OFF = 1;            // 1 = solo verifica la IK (q_ref) sin mover; 0 = mueve la pierna
                                  // (arranca en 1 por seguridad: ponlo en 0 EN VIVO en Expressions)
-float Kp_test[2] = {400.0, 600.0}; // afinados en banco 2026-06-10: vencen la friccion (cadera) y el
-                                   // resorte (rodilla) con error <0.01 rad, sin oscilar
-float Kd_test[2] = {  0.0,   0.0}; // D = 0: sin zumbido (la derivada cruda es ruidosa)
+// ===== MODELO DEL MOTOR goBILDA (Ec.18 del paper; los usa prevent_saturation) =====
+// Desde 2026-06-10 (noche) u[] es TORQUE REAL en N*m y prevent_saturation lo convierte a
+// voltaje: V = Rw/(kT*N)*u + kv*N*qdot_f. El mapeo viejo del ejemplo (10/64.125) trataba
+// "64 N*m" como pwm completo, pero fisicamente pwm completo = 12 V = ~3.4 N*m a rotor parado
+// -> mandaba ~5% del voltaje para los torques reales del MATLAB (el empuje no se sentia).
+float Rw = 1.3;                  // resistencia de armadura (ohm)
+float kT = 0.0135;               // constante de torque (N*m/A)
+float kv = 0.0186;               // constante de back-EMF (V*s/rad)
+float NH = 26.9;                 // reduccion cadera (rotor -> eje = unidades de q_now[0])
+float NK = 28.8;                 // reduccion EFECTIVA rodilla en unidades de e (la escala 806.4
+                                 // del eqep2 hace que el 26.9 fisico se vea como 28.8 = el N_K del PDF)
+float VMAX = 12.0;               // bus del driver: pwm 10 = 12 V
+// Ganancias del PD de banco, AHORA EN N*m/rad: {20.9, 30.9} = equivalentes EXACTOS de los
+// {400, 600} verificados en banco con el mapeo viejo (mismo pwm por radian de error).
+float Kp_test[2] = {20.9, 30.9};
+float Kd_test[2] = { 0.0,  0.0}; // D = 0; con el filtro qdot_f ya se puede subir (0.26 = el "5" viejo)
 float u_lim_test = 4.0;          // limite de pseudo-pwm (de 10). Subelo en vivo si la rodilla no alcanza
 float ramp_rate  = 0.15;         // rad/s -> MUY lento (ya no se usa en el aereo)
 // ===== MORFOLOGIA REAL DE LA PIERNA (aclarada 2026-06-10, ver HANDOFF_FIRMWARE.md) =====
@@ -217,6 +230,43 @@ float wp[NWP][2] = {
   { 0.524, -1.000},   // cuclilla: cadera +30 deg, rodilla -57 deg (mueve los dos juntos)
 };
 int   wp_i = 0;  float t_wp = 0.0;
+
+/****** ETAPA 2 — CONTROL DE APOYO (banco): empuje GRF Bezier  u = -J^T*[Fx;Fz] + PD suave ******/
+// Port fiel de la Ec.19 del paper (controller.py / Simulator_MATLAB, ver mujoco/CONTROL_FORWARD.md).
+// El empuje dura Tst y el perfil de fuerza [Fx;Fz] (N, frame de cadera: x adelante, z arriba)
+// es un Bezier de 4to orden. El torque sale en espacio FK y se mapea a motor: cadera 1:1,
+// rodilla MULTIPLICADA por dq1_FK/de = 2*KA*e+KB (4-barras). MOTORS_OFF sigue mandando.
+int   STANCE_TEST = 0;        // 1 = habilita el modo apoyo (los disparos de abajo)
+int   st_go     = 0;          // poner 1 EN VIVO = dispara UN empuje (se auto-limpia)
+int   st_auto   = 0;          // 1 = empuje ciclico cada st_period ms
+long  st_period = 3000;       // periodo del modo auto (ms)
+int   st_sensor = 0;          // 1 = dispara al PISAR el sensor de pie (flanco 0->1 de phase)
+float Tst      = 0.35;        // duracion del empuje (s). Dry-run: subir a 5.0 y mirar F_des/u_st
+float fz_scale = 1.0;         // escala del perfil vertical (pico real del Bezier ~42 N a s=0.5)
+float fx_scale = 1.0;         // escala del tangencial. Su SIGNO fija el sentido de avance (Etapa 3)
+float Fz_bz[5] = {0.0, 20.0, 100.0, 0.0, 0.0};   // puntos de control (= MATLAB/sim)
+float Fx_bz[5] = {0.0,  0.0, -25.0, 0.0, 0.0};
+float Kp_st = 0.03;           // PD suave de apoyo en espacio FK (= MATLAB; es un regularizador)
+float Kd_st = 0.08;
+float blend_ms = 10.0;        // mezcla aereo->apoyo (Ec.20) para no meter un escalon de torque
+int   st_active = 0;          // (estado) 1 mientras empuja
+float st_t = 0.0;             // (estado) tiempo dentro del empuje (s)
+float qd_st_fk[2] = {0.0, 0.0};  // pose FK capturada al iniciar el empuje (ref del PD suave)
+float F_des[2]  = {0.0, 0.0};    // [Fx;Fz] actuales del Bezier (N) — mirar en Expressions
+float tau_fk[2] = {0.0, 0.0};    // torque de apoyo en espacio FK (N*m)
+float u_air[2]  = {0.0, 0.0};    // torque del PD aereo (espacio motor)
+float u_st[2]   = {0.0, 0.0};    // torque de apoyo en espacio MOTOR (N*m) — mirar en dry-run
+int   phase_prev = 0;            // para el flanco de subida del sensor (st_sensor)
+// Filtro de velocidad (= Fase 5 de la sim, lambda=10 rad/s): permite usar Kd sin zumbido.
+float vel_lambda = 10.0;      // ancho de banda (rad/s). Subir EN VIVO (20-30) si la D va lenta
+float qdot_f[2]  = {0.0, 0.0};   // qdot filtrada (espacio encoder)
+float qfk_dot[2] = {0.0, 0.0};   // velocidad en espacio FK (rodilla = f'(e)*qdot_f[1])
+// PICOS del ultimo empuje (se resetean al disparar y QUEDAN CONGELADOS al terminar:
+// leerlos despues con calma, sin pelear con el refresh de Expressions)
+float pk_Fz = 0.0;            // max F_des[1] comandada (N)
+float pk_pwm[2] = {0.0, 0.0}; // max |pwm| FINAL enviado a cada motor (post-saturacion)
+float pk_e_min = 0.0;         // min/max de q_now[1] durante el empuje: cuanto VIAJO la
+float pk_e_max = 0.0;         // rodilla (pk_e_max cerca de 0 = topo en su extension)
 /****************************************************** OUR ADDITION END **********************************************************/
 
 
@@ -319,8 +369,9 @@ void update_jacobian(void)
 {
     /*This function is given and will be useful when calculating anything in task space. This finds the jacobian*/
      // update jacobian
-    // Con los angulos FK REALES (q_fk), no los del encoder. OJO Etapa 2: para u=-J^T*F el torque
-    // de rodilla ademas se divide entre d(q1_FK)/de = 2*KA*e+KB (regla de la cadena del 4-barras).
+    // Con los angulos FK REALES (q_fk), no los del encoder. Para u=-J^T*F el torque de rodilla
+    // ademas se MULTIPLICA por d(q1_FK)/de = 2*KA*e+KB (trabajo virtual: tau_m*de = tau_FK*dq1
+    // -> tau_m = tau_FK*f'(e); como f' es negativo, el signo del motor sale correcto solo).
     J[0][0] = LH*cos(q_fk[0]) + LKF*cos(q_fk[0] + q_fk[1]);
     J[0][1] = LKF*cos(q_fk[0] + q_fk[1]);
     J[1][0] = LH*sin(q_fk[0]) + LKF*sin(q_fk[0] + q_fk[1]);
@@ -365,6 +416,17 @@ void update_states(void)
     q_fk[0] = q_now[0] + beta_off;
     q_fk[1] = KA*q_now[1]*q_now[1] + KB*q_now[1] + KC;
 
+    // filtro pasa-bajas de velocidad (1er orden, = Fase 5 de la sim con lambda=10):
+    // qdot_f es la que usan los terminos D del control (la derivada cruda zumba)
+    {
+        float af = vel_lambda*T/(1.0 + vel_lambda*T);
+        qdot_f[0] += af*(qdot_now[0] - qdot_f[0]);
+        qdot_f[1] += af*(qdot_now[1] - qdot_f[1]);
+    }
+    // velocidad en espacio FK (rodilla via regla de la cadena del 4-barras)
+    qfk_dot[0] = qdot_f[0];
+    qfk_dot[1] = (2.0*KA*q_now[1] + KB)*qdot_f[1];
+
     // For stance controller
     update_jacobian();
 
@@ -374,28 +436,90 @@ void update_states(void)
 
 }
 
+float bezier4(const float *c, float s)
+{
+    // Bezier de 4to orden (5 puntos de control), s en [0,1] — identico a twin.bezier de la sim
+    float m, s2, m2;
+    if (s < 0.0) s = 0.0;
+    if (s > 1.0) s = 1.0;
+    m = 1.0 - s;
+    s2 = s*s;  m2 = m*m;
+    return c[0]*m2*m2 + 4.0*c[1]*s*m2*m + 6.0*c[2]*s2*m2 + 4.0*c[3]*s2*s*m + c[4]*s2*s2;
+}
 void calculate_control(void)
 {
     /*This function is our main control function. Whatever control algorithm we need should be done here.
      *This function should be called after trajectory/feed-forward is determined and states updated,
      *but before we check for saturation*/
 
-    // PRUEBA LENTA: PD de junta suave hacia q_ref (o motores OFF para solo leer encoders).
-    if (MOTORS_OFF) { u[0] = 0.0; u[1] = 0.0; return; }
-    u[0] = Kp_test[0]*err_q[0] - Kd_test[0]*qdot_now[0];
-    u[1] = Kp_test[1]*err_q[1] - Kd_test[1]*qdot_now[1];
+    // AEREO (Etapa 1): PD de junta hacia q_ref. La D ahora usa la velocidad FILTRADA (qdot_f):
+    // con el filtro ya se puede subir Kd_test en vivo sin el zumbido de la derivada cruda.
+    u_air[0] = Kp_test[0]*err_q[0] - Kd_test[0]*qdot_f[0];
+    u_air[1] = Kp_test[1]*err_q[1] - Kd_test[1]*qdot_f[1];
+
+    // ETAPA 2 — disparo del empuje (manual st_go / ciclico st_auto / sensor de pie st_sensor)
+    if (!STANCE_TEST) {
+        st_active = 0;
+    } else if (!st_active) {
+        int rising = (phase && !phase_prev);
+        if (st_go || (st_auto && (cnt % st_period) == 0) || (st_sensor && rising)) {
+            st_go = 0;
+            st_active = 1;
+            st_t = 0.0;
+            qd_st_fk[0] = q_fk[0];   // ref del PD suave = la pose al iniciar (la cuclilla),
+            qd_st_fk[1] = q_fk[1];   // como el q_d fijo de touchdown del MATLAB
+            pk_Fz = 0.0;             // resetea los picos del empuje anterior
+            pk_pwm[0] = 0.0;  pk_pwm[1] = 0.0;
+            pk_e_min = q_now[1];  pk_e_max = q_now[1];
+        }
+    }
+    phase_prev = phase;
+
+    if (st_active) {
+        // APOYO (Ec.19): u_fk = -J^T*[Fx;Fz] + PD suave, todo en espacio FK
+        float s = st_t / Tst;
+        float al;
+        F_des[0] = fx_scale*bezier4(Fx_bz, s);
+        F_des[1] = fz_scale*bezier4(Fz_bz, s);
+        tau_fk[0] = -(J[0][0]*F_des[0] + J[1][0]*F_des[1])
+                    + Kp_st*(qd_st_fk[0] - q_fk[0]) - Kd_st*qfk_dot[0];
+        tau_fk[1] = -(J[0][1]*F_des[0] + J[1][1]*F_des[1])
+                    + Kp_st*(qd_st_fk[1] - q_fk[1]) - Kd_st*qfk_dot[1];
+        // FK -> motor: cadera 1:1 (offset 0); rodilla x dq1_FK/de (4-barras, ver update_jacobian)
+        u_st[0] = tau_fk[0];
+        u_st[1] = tau_fk[1]*(2.0*KA*q_now[1] + KB);
+        // blending aereo->apoyo (Ec.20, ~10 ms)
+        al = (blend_ms > 0.0) ? st_t*1000.0/blend_ms : 1.0;
+        if (al > 1.0) al = 1.0;
+        u[0] = al*u_st[0] + (1.0 - al)*u_air[0];
+        u[1] = al*u_st[1] + (1.0 - al)*u_air[1];
+        st_t += T;
+        if (st_t >= Tst) {     // fin del empuje -> el PD aereo recoge la pierna a la cuclilla
+            st_active = 0;
+            F_des[0] = 0.0;  F_des[1] = 0.0;
+        }
+    } else {
+        u[0] = u_air[0];
+        u[1] = u_air[1];
+    }
+
+    // MOTORS_OFF al FINAL: todo lo de arriba queda CALCULADO (dry-run: mirar F_des, tau_fk,
+    // u_st y u_air en Expressions con los motores quietos), pero al motor no le llega nada.
+    if (MOTORS_OFF) { u[0] = 0.0; u[1] = 0.0; }
 }
 void prevent_saturation(void)
 {
     /*This function accesses global control effort variable and makes sure it isnt saturating the motors. No inputs or outputs required
      * This function should be called at the end of processing, directly before the commands are being sent to the motors*/
-    // saturation protection
 
-    //Torque_max_hip = 64.125 & Torque_max_knee = 69.7270
-    //Torque mapping from 10 -> 69.7 and -10 -> -69.7
-
-    u[0] =  (10/64.125) * u[0];//signo INVERTIDO (- -> +): el motor de cadera corria al reves del encoder
-    u[1] =  (10/69.727) * u[1];//rodilla: signo + (original). Con - empujaba a extension (confirmado a mano)
+    // Ec.18 del paper (= controller.py): u[] llega en TORQUE REAL (N*m, en unidades de junta
+    // del encoder) y aqui se convierte a VOLTAJE con compensacion de back-EMF:
+    //     V = Rw/(kT*N)*u + kv*N*qdot_f      pwm = 10*V/VMAX  (pwm 10 = 12 V)
+    // Reemplaza el mapeo del ejemplo (10/64.125 y 10/69.727), que entregaba ~5% del voltaje
+    // para torques reales (ver nota en la declaracion de Rw/kT/kv arriba).
+    // SIGNOS verificados en banco (sin cambio): cadera +, rodilla +.
+    u[0] = (10.0/VMAX) * (Rw/(kT*NH)*u[0] + kv*NH*qdot_f[0]);
+    u[1] = (10.0/VMAX) * (Rw/(kT*NK)*u[1] + kv*NK*qdot_f[1]);
 
     //limite de SEGURIDAD de la prueba (u_lim_test, mas bajo que 10). En operacion normal seria 10.
     if      (u[0] >  u_lim_test) u[0] =  u_lim_test;
@@ -427,6 +551,17 @@ void DoEveryMilliSecond_CPU1(void)
 
     //double check to make motors are not overcommanded
     prevent_saturation();
+
+    // registra los PICOS del empuje (u aqui ya es el pwm final que se manda al motor)
+    if (st_active) {
+        float a0 = (u[0] < 0.0 ? -u[0] : u[0]);
+        float a1 = (u[1] < 0.0 ? -u[1] : u[1]);
+        if (F_des[1] > pk_Fz)    pk_Fz = F_des[1];
+        if (a0 > pk_pwm[0])      pk_pwm[0] = a0;
+        if (a1 > pk_pwm[1])      pk_pwm[1] = a1;
+        if (q_now[1] < pk_e_min) pk_e_min = q_now[1];
+        if (q_now[1] > pk_e_max) pk_e_max = q_now[1];
+    }
 
     //send commands to motors
     set_EPWM1A_VNH5019(u[0]);
