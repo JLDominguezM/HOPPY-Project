@@ -251,8 +251,15 @@ confiar en métricas que cuentan despegue del pie.**
 | `view_twin_static.py` | Ensamble CONGELADO con la malla CAD detallada (inspeccionar). |
 | `render_twin.py` | Video `figuras/twin_salto.mp4`. |
 | `tune_eval.py`, `control.py`, `view.py`, `render.py`, `ref_matlab.csv` | Modelo abstracto histórico (§7). |
+| `ablacion.py` | Rúbrica Fase 2.2: influencia de armature/damping/resorte/saturación (figuras/ablacion.png). |
+| `comparacion_integradores.py` | Justificación de implicitfast vs el RK4 recomendado (figuras/integradores.png). |
+| `plot_signals.py` | Señales de la rúbrica Fase 5, 7 paneles (figuras/señales_rubrica.png). |
 | `meshes/twin_*.obj`, `meshes/IMP-*.STL` | Mallas (gitignored las twin_*, regenerables). |
 | `figuras/` | Renders, diagramas de pivotes, comparaciones de pierna. |
+
+(2026-06-11: se borraron `control_legacy.py`, `view_debug.py`, `build_model.py`,
+`sweep.py` y `tune_metric.py` - código muerto superado; recuperable del historial
+de git. El índice de material para la presentación vive en `../PRESENTACION.md`.)
 
 ---
 
