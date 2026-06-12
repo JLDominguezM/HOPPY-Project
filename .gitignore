@@ -10,3 +10,7 @@ octave-workspace
 __pycache__/
 *.pyc
 mujoco/sweep_top.json
+
+# notas de trabajo locales (no versionar)
+notas/
+presentacion/
