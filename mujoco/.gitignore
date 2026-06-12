@@ -1,0 +1,21 @@
+# artefactos pesados / generados (no versionar)
+meshes/
+*.glb
+__pycache__/
+*.bak
+best_honest.json
+# (las figuras del overlay CAD ahora SI se versionan: documentan las iteraciones
+#  del gemelo y sirven para la presentacion)
+# URDF import: zip fuente + log de export (pesados; meshes/ ya esta arriba). meshes_mj/ SI se versiona.
+*.zip
+HOPPY-E0-final/export.log
+HOPPY-E0-final/urdf/*.mjcf.xml
+# tuner del URDF: archivos de runtime (resultados/logs regenerables)
+urdf_best.json
+urdf_best_candidate.json
+urdf_tune.log
+urdf_tune.pid
+
+# caches y logs generados (regenerables al correr los scripts)
+.cache/
+hop_urdf_log.csv

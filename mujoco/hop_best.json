@@ -1,0 +1,11 @@
+{
+  "rise_cm": 18.09,
+  "vuelos": 16,
+  "params": {
+    "TAU_HIP": 3.3545,
+    "TAU_KNEE": 3.7761,
+    "T_crouch": 0.0907,
+    "T_push": 0.1616,
+    "q4_crouch": -1.1561
+  }
+}

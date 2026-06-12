@@ -1,0 +1,406 @@
+#include <xdc/std.h>
+#include <xdc/runtime/Log.h>
+#include <xdc/runtime/Error.h>
+#include <xdc/runtime/System.h>
+
+#include <ti/sysbios/BIOS.h>
+#include <ti/sysbios/knl/Task.h>
+#include <ti/sysbios/knl/Swi.h>
+#include <ti/sysbios/knl/Clock.h>
+#include <ti/sysbios/knl/Semaphore.h>
+#include <ti/sysbios/family/c28/Hwi.h>
+
+#include "F28x_Project.h"
+#include "F2837xD_device.h"
+#include "F2837xD_Ipc_drivers.h"
+
+// Customized functions
+#include "LCD.h"
+#include "F28379D_Serial.h"
+#include "F28379D_EPwm.h"     // for PWM signal
+#include "F28379D_EQep.h"
+
+
+#define PI       3.1415926535897932384626433832795
+#define TWOPI    6.2831853071795864769252867665590
+#define HALFPI   1.
+
+// Data to be sent to Simunlink plotting
+int adcb0result = 0; // 16-bit
+int adcb1result = 0; // 16-bit
+long read_1 = 0; // 32-bit
+long read_2 = 0; // 32-bit
+
+void simulink_serial_RXD(serial_t *s, char data);
+
+#ifdef _FLASH
+    // These are defined by the linker (see device linker command file)
+    extern unsigned int RamfuncsLoadStart;
+    extern unsigned int RamfuncsLoadSize;
+    extern unsigned int RamfuncsRunStart;
+#endif
+
+extern eqep_t eqep1;
+extern eqep_t eqep2;
+// For motor PWM control
+float u_ctrl_1a = 0.0;
+float u_ctrl_1b = 0.0;
+
+float enc_read_cur_1 = 0.0;
+float enc_read_cur_2 = 0.0;
+
+// For F28379D quadrature encoder counter
+// PI control for speed control
+
+float dt = 0.001;                // sample period 1ms
+
+// SYS/BIOS Clock function
+long int time_counter = 0;
+void DoEveryMilliSecond_CPU1(void){
+
+    // motor1 control
+    enc_read_cur_1 = read_Enc1();
+
+
+    set_EPWM1A_VNH5019(u_ctrl_1a);
+
+
+    // motor2 control
+    enc_read_cur_2 = read_Enc2();
+
+
+    set_EPWM1B_VNH5019(u_ctrl_1b);
+
+
+
+    // print every 500 ms
+    if((time_counter%500)==0){
+        serial_printf(&SerialA,"M1-Control: %.3f", u_ctrl_1a);
+        serial_printf(&SerialA,"M2-Control: %.3f", u_ctrl_1b);
+    }
+    time_counter++;
+
+}
+
+
+// SYS/BIOS Clock function
+void DoEverySecond_CPU1(void){
+    GpioDataRegs.GPADAT.bit.GPIO31 ^= 1;
+}
+
+
+//#pragma CODE_SECTION(function_name, "ramfuncs");
+//void function_name(void)
+//{}
+
+int main() {
+
+    #ifdef _FLASH
+        memcpy(&RamfuncsRunStart, &RamfuncsLoadStart, (size_t)&RamfuncsLoadSize);
+    #endif
+
+    // Comment this when use CCS for debugging
+//    #ifdef _FLASH
+//        // Send boot command to allow the CPU2 application to begin execution
+//        IPCBootCPU2(C1C2_BROM_BOOTMODE_BOOT_FROM_FLASH);
+//    #else
+//        // Send boot command to allow the CPU2 application to begin execution
+//        IPCBootCPU2(C1C2_BROM_BOOTMODE_BOOT_FROM_RAM);
+//    #endif
+
+    #ifdef _FLASH
+        InitFlash();
+    #endif
+
+    // Initialize System Control: PLL, WatchDog, enable Peripheral Clocks
+    InitSysCtrl(); // F2837xD_SysCtrl.c
+
+    // Initialize GPIO
+    InitGpio(); // F2837xD_Gpio.c
+
+    EALLOW;
+
+    // For CPU1
+    // Enable an GPIO output on GPIO31, set it high
+    GpioCtrlRegs.GPAPUD.bit.GPIO31 = 0;   // Enable pullup on GPIO31
+    GpioDataRegs.GPASET.bit.GPIO31 = 1;   // Load output latch
+    GpioCtrlRegs.GPAMUX2.bit.GPIO31 = 0;  // GPIO31 = GPIO31
+    GpioCtrlRegs.GPADIR.bit.GPIO31 = 1;   // GPIO31 = output
+
+    // For CPU2
+    // Enable an GPIO output on GPIO34, set it high
+    GpioCtrlRegs.GPBPUD.bit.GPIO34 = 0;   // Enable pullup on GPIO3
+    GpioDataRegs.GPBSET.bit.GPIO34 = 1;   // Load output latch
+    GpioCtrlRegs.GPBDIR.bit.GPIO34 = 1;   // GPIO34 = output
+
+    GpioCtrlRegs.GPBCSEL1.bit.GPIO34 = 2; // MUX with CPU2
+    GpioCtrlRegs.GPBGMUX1.bit.GPIO34 = 0;
+    GpioCtrlRegs.GPBMUX1.bit.GPIO34 = 0;
+
+    // Driverlib way for CPU2
+//    GpioCtrlRegs.GPBDIR.bit.GPIO34 = 1;   // GPIO34 = output
+//    GPIO_SetupPinOptions(34, GPIO_OUTPUT, GPIO_PUSHPULL);
+//    GPIO_SetupPinMux(34, GPIO_MUX_CPU2, 0);
+
+    EDIS;
+
+
+    /***************************** Init Simulink Serial *****************************/
+
+    // GPIO19 - SCIRXDB, GPIO18 - SCITXDB, Simulink plot through SCI-B
+    //init_serial(&SerialB, 115200, simulink_serial_RXD);
+
+    init_serial(&SerialA, 115200, NULL);
+
+    /********************************* Init Text LCD *********************************/
+
+
+    init_serial(&SerialC, 19200, NULL);
+
+    /********************************** Init EPwm1A **********************************/
+
+    init_EPWM1A_GPIO_VNH5019();      // init GPIO0 as EPWM1A (J4-40)
+    init_EPWM1A_VNH5019();           // init EPWM1A with a 20KHz carrier frequency PWM signal.
+    set_EPWM1A_VNH5019(u_ctrl_1a);   // set to 0 (50% duty cycle)at the beginning, update in SYS/BIOS
+
+    init_EPWM1B_GPIO_VNH5019();      // init GPIO1 as EPWM1A (J4-39)
+    init_EPWM1B_VNH5019();           // init EPWM1B with a 20KHz carrier frequency PWM signal.
+    set_EPWM1B_VNH5019(u_ctrl_1b);   // set to 0 (50% duty cycle)at the beginning, update in SYS/BIOS
+
+
+    /****************************** Init EQep1 and EQep2 *****************************/
+    // J14 - EQEP1A(GPIO20), EQEP1B(GPIO21), J15 - EQEP2A(GPIO54), EQEP2B(GPIO55)
+
+    // 7: total slits of motor's encoder in one revolution
+    // 19.2: gear ratio
+    // 537.6 =  7 * 19.2 * 4
+    // 1: polarity of motor direction
+    // 0: start  0 rad
+    init_EQEP(&eqep1, EQEP1, 537.6, 1, 0.0);
+    //init_EQEP(&eqep1, EQEP1, 103.6, 1, 0.0);
+    EQep1Regs.QPOSCNT = 0;
+
+    // 7: total slits of motor's encoder in one revolution
+    // 26.9: gear ratio
+    // 753.2 = 7 * 26.9 * 4
+    // -1: polarity of motor direction
+    // 0: start  0 rad
+    init_EQEP(&eqep2, EQEP2, 753.2, 1, 0.0);
+    EQep2Regs.QPOSCNT = 0;
+    enc_read_cur_1 = read_Enc1(); // read encoder1 at the beginning, update in SYS/BIOS func
+    enc_read_cur_2 = read_Enc2(); // read encoder2 at the beginning, update in SYS/BIOS func
+
+
+
+
+
+
+
+    /*************************  NO CODE below here in Main() *************************/
+
+    // Clear all interrupts and initialize PIE vector table:
+    // Disable CPU interrupts
+    DINT;
+
+    // Disable CPU interrupts and clear all CPU interrupt flags
+//    IER = 0x0000;
+    IFR = 0x0000;
+
+    // Enable global Interrupts and higher priority real-time debug events
+    EINT;  // Enable Global interrupt INTM
+    ERTM;  // Enable Global real-time interrupt DBGM
+
+    PieCtrlRegs.PIEACK.all = (PIEACK_GROUP8 | PIEACK_GROUP9);  // ACKnowledge any SCI interrupt requests
+
+    BIOS_start();
+
+    return 0;
+
+}
+
+
+
+// For communication between Simulink & CCS
+
+char SIMU_databyte1 = 0;
+char SIMU_TXrawbytes[12];
+
+int SIMU_datacollect = 0;
+int SIMU_beginnewdata = 0;
+int SIMU_Tranaction_Type = 0;
+int SIMU_checkfirstcommandbyte = 0;
+
+int SIMU_Var1_fromSIMU_16bit = 0;
+int SIMU_Var2_fromSIMU_16bit = 0;
+int SIMU_Var3_fromSIMU_16bit = 0;
+int SIMU_Var4_fromSIMU_16bit = 0;
+int SIMU_Var5_fromSIMU_16bit = 0;
+int SIMU_Var6_fromSIMU_16bit = 0;
+int SIMU_Var7_fromSIMU_16bit = 0;
+
+int SIMU_Var1_toSIMU_16bit = 0;   // value to be sent to Simulink
+int SIMU_Var2_toSIMU_16bit = 0;   // value to be sent to Simulink
+long SIMU_Var1_toSIMU_32bit = 0;  // value to be sent to Simulink
+long SIMU_Var2_toSIMU_32bit = 0;  // value to be sent to Simulink
+
+void simulink_serial_RXD(serial_t *s, char data) {
+
+//  if (savenumbytes < 400) {  // Just for Debug
+//      savebytes[savenumbytes] = data;
+//      savenumbytes++;
+//  }
+
+    // Only true if have not yet begun a message
+    if (!SIMU_beginnewdata) {
+
+        if (SIMU_checkfirstcommandbyte == 1) {
+
+            // Check for start 2 bytes command = 32767 because assuming command will stay between -10000 and 10000
+            if (0xFF == (unsigned char)data) {
+                SIMU_checkfirstcommandbyte = 0;
+            }
+
+        } else {
+
+            SIMU_checkfirstcommandbyte = 1;
+
+            // Check for start char
+            if (0x7F == (unsigned char)data) {
+
+                SIMU_datacollect = 0;       // amount of data collected in message set to 0
+
+                SIMU_beginnewdata = 1;      // flag to indicate we are collecting a message
+
+                SIMU_Tranaction_Type = 2;
+
+                // Could Start ADC and then ADC interrupt will read ENCs also and then send
+                // but that is for Simulink control
+                // For Simulink data collection just send most current ADC and ENCs
+                // Simulink Sample rate needs to be at least 500HZ but 200Hz probably better
+
+                /*
+                 * When Simulink requests data from the DSP these four variables are sent.
+                 *
+                 * Assign these four variables the values you would like to plot in Simulink
+                 *
+                 * Notice that two 32-bit integers and two 16-bit integers. To upload a floating
+                 * point value you will need to scale it by a factor and then remember to scale
+                 * it back down on Simulink¡¯s end.
+                 *
+                 * 32-bit integer: -2147483648 to 2147483647
+                 * 16-bit integer: -32768 to 32767
+                 *
+                 */
+
+                SIMU_Var1_toSIMU_32bit = read_1;
+                SIMU_Var2_toSIMU_32bit = read_2;
+
+                SIMU_Var1_toSIMU_16bit = adcb0result;
+                SIMU_Var2_toSIMU_16bit = adcb1result;
+
+
+                SIMU_TXrawbytes[3] = (char)((SIMU_Var1_toSIMU_32bit >> 24) & 0xFF);
+                SIMU_TXrawbytes[2] = (char)((SIMU_Var1_toSIMU_32bit >> 16) & 0xFF);
+                SIMU_TXrawbytes[1] = (char)((SIMU_Var1_toSIMU_32bit >> 8) & 0xFF);
+                SIMU_TXrawbytes[0] = (char)((SIMU_Var1_toSIMU_32bit) & 0xFF);
+
+                SIMU_TXrawbytes[7] = (char)((SIMU_Var2_toSIMU_32bit >> 24) & 0xFF);
+                SIMU_TXrawbytes[6] = (char)((SIMU_Var2_toSIMU_32bit >> 16) & 0xFF);
+                SIMU_TXrawbytes[5] = (char)((SIMU_Var2_toSIMU_32bit >> 8) & 0xFF);
+                SIMU_TXrawbytes[4] = (char)((SIMU_Var2_toSIMU_32bit) & 0xFF);
+
+                SIMU_TXrawbytes[8] = (char)(SIMU_Var1_toSIMU_16bit & 0xFF);
+                SIMU_TXrawbytes[9] = (char)((SIMU_Var1_toSIMU_16bit >> 8) & 0xFF);
+                SIMU_TXrawbytes[10] = (char)(SIMU_Var2_toSIMU_16bit & 0xFF);
+                SIMU_TXrawbytes[11] = (char)((SIMU_Var2_toSIMU_16bit >> 8) & 0xFF);
+
+                serial_send(&SerialB, SIMU_TXrawbytes, 12);
+
+            }
+        }
+
+    } else {  // Filling data
+
+        if (SIMU_Tranaction_Type == 2) {
+
+            if (SIMU_datacollect == 0) {
+                SIMU_databyte1 = data;
+                SIMU_datacollect++;
+
+            } else if (SIMU_datacollect == 1) {
+
+                SIMU_Var1_fromSIMU_16bit = ((int)data)<<8 | SIMU_databyte1;
+                SIMU_datacollect++;
+
+            } else if (SIMU_datacollect == 2) {
+
+                SIMU_databyte1 = data;
+                SIMU_datacollect++;
+
+            } else if (SIMU_datacollect == 3) {
+
+                SIMU_Var2_fromSIMU_16bit = ((int)data)<<8 | SIMU_databyte1;
+                SIMU_datacollect++;
+
+            } else if (SIMU_datacollect == 4) {
+
+                SIMU_databyte1 = data;
+                SIMU_datacollect++;
+
+            } else if (SIMU_datacollect == 5) {
+
+                SIMU_Var3_fromSIMU_16bit = ((int)data)<<8 | SIMU_databyte1;
+                SIMU_datacollect++;
+
+            } else if (SIMU_datacollect == 6) {
+
+                SIMU_databyte1 = data;
+                SIMU_datacollect++;
+
+            } else if (SIMU_datacollect == 7) {
+
+                SIMU_Var4_fromSIMU_16bit = ((int)data)<<8 | SIMU_databyte1;
+                SIMU_datacollect++;
+
+            } else if (SIMU_datacollect == 8) {
+
+                SIMU_databyte1 = data;
+                SIMU_datacollect++;
+
+            } else if (SIMU_datacollect == 9) {
+
+                SIMU_Var5_fromSIMU_16bit = ((int)data)<<8 | SIMU_databyte1;
+                SIMU_datacollect++;
+
+            } else if (SIMU_datacollect == 10) {
+
+                SIMU_databyte1 = data;
+                SIMU_datacollect++;
+
+            } else if (SIMU_datacollect == 11) {
+
+                SIMU_Var6_fromSIMU_16bit = ((int)data)<<8 | SIMU_databyte1;
+                SIMU_datacollect++;
+
+            } else if (SIMU_datacollect == 12) {
+
+                SIMU_databyte1 = data;
+                SIMU_datacollect++;
+
+            } else if (SIMU_datacollect == 13) {
+
+                SIMU_Var7_fromSIMU_16bit = ((int)data)<<8 | SIMU_databyte1;
+                SIMU_beginnewdata = 0;  // Reset the flag
+                SIMU_datacollect = 0;   // Reset the number of chars collected
+                SIMU_Tranaction_Type = 0;
+            }
+        }
+    }
+}
+
+
+
+
+
+
+

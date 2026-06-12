@@ -1,6 +1,6 @@
-# Piezas a imprimir — rediseño de clase
+# Piezas a imprimir - rediseño de clase
 
-⚠️ **Importante:** este proyecto usa el **rediseño del equipo** (BOM de clase
+**Importante:** este proyecto usa el **rediseño del equipo** (BOM de clase
 `BOM - HOPPY.xlsx`), **no** las piezas goBilda originales del repo. Las piezas a
 imprimir son **IMP-1 … IMP-30 + CASE 1/2**, no las piezas goBilda.
 
@@ -24,8 +24,8 @@ imprimir son **IMP-1 … IMP-30 + CASE 1/2**, no las piezas goBilda.
 
 ## Recomendaciones de impresión en PLA
 Como el robot recibe impactos al aterrizar, para el PLA:
-- Boquilla **210–220 °C**, perímetros lentos (**30–40 mm/s**), ventilador **40–70 %**.
-- **5 paredes**, relleno **50–70 %**, capas top/bottom 6.
+- Boquilla **210-220 °C**, perímetros lentos (**30-40 mm/s**), ventilador **40-70 %**.
+- **5 paredes**, relleno **50-70 %**, capas top/bottom 6.
 - **Orientar acostado** para que el impacto quede a lo largo de las capas (no delamine).
 - Insertos térmicos M2/M3/M4 → calentar con cautín e insertar; no imprimir roscas.
 - Empezar pruebas con fuerza de salto baja; tener repuestos de las piezas de la pata.
