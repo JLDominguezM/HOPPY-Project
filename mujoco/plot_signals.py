@@ -1,13 +1,16 @@
-"""Análisis completo de señales del GEMELO HOPPY — Rúbrica Fase 5.
+"""Análisis completo de señales del GEMELO HOPPY - Rúbrica Fase 5.
 
-Genera figuras/señales_rubrica.png con 6 subplots (3x2) que cubren las 5 familias
-de señales que pide la rúbrica:
+Genera figuras/señales_rubrica.png con 8 subplots (4x2) que cubren las familias
+de señales que pide la rúbrica (posiciones y velocidades TANTO cartesianas como
+articulares, GRF, torques y FSM):
   [0,0] posiciones articulares  q3 (cadera), q4 (rodilla)
   [0,1] posición cartesiana del pie  x, y, z  (data.site_xpos[foot_site])
-  [1,0] velocidad ESTIMADA filtrada (Hoppy.qd_filt, lambda=10) vs qvel cruda (gris ---)
-  [1,1] fuerza de contacto vertical (GRF)  + referencia en 0
-  [2,0] torques de control  tau3, tau4  + lineas ±tau_max (kT*N*IMAX)
-  [2,1] estado FSM  0=FLIGHT / 1=STANCE  (fondo azul=vuelo, verde=apoyo)
+  [1,0] velocidad articular ESTIMADA filtrada (Hoppy.qd_filt, lambda=10) vs cruda
+  [1,1] velocidad CARTESIANA del pie estimada = J(q)·qd_filt (frame de cadera,
+        la misma cadena de emulación de encoder que usa el controlador) vs cruda
+  [2,0] fuerza de contacto vertical (GRF)  + referencia en 0
+  [2,1] torques de control  tau3, tau4  + lineas ±tau_max (kT*N*IMAX)
+  [3,0] estado FSM  0=FLIGHT / 1=STANCE  (fondo azul=vuelo, verde=apoyo)
 
 Datos (verificados contra el modelo, no asumidos):
   - tau aplicado = rec["tau3"]/rec["tau4"] de control_step (tau = kT*N*i)
@@ -43,6 +46,7 @@ def run():
     n = int(T_TOTAL / DT)
     keys = ("t", "q3", "q4", "foot_x", "foot_y", "foot_z",
             "raw_hip", "raw_knee", "filt_hip", "filt_knee",
+            "vest_x", "vest_z", "vraw_x", "vraw_z",
             "grf", "tau3", "tau4", "phase", "contact")
     log = {k: [] for k in keys}
     for _ in range(n):
@@ -51,11 +55,19 @@ def run():
         raw_knee = h.d.qvel[knee_v]
         foot = h.d.site_xpos[h.fs].copy()
         rec = h.step()                       # control_step (actualiza qd_filt) + mj_step
+        # velocidad CARTESIANA del pie (frame de cadera): estimada = J·qd_filt
+        # (la misma cadena encoder->filtro->Jacobiano del controlador) vs cruda = J·qvel
+        R2, _hip = h._hip_frame()
+        Jhip = h._foot_jac_hip(R2)
+        v_est = Jhip @ h.qd_filt
+        v_raw = Jhip @ np.array([h.d.qvel[hip_v], h.d.qvel[knee_v]])
         log["t"].append(rec["t"])
         log["q3"].append(rec["q3"]);            log["q4"].append(rec["q4"])
         log["foot_x"].append(foot[0]); log["foot_y"].append(foot[1]); log["foot_z"].append(foot[2])
         log["raw_hip"].append(raw_hip);         log["raw_knee"].append(raw_knee)
         log["filt_hip"].append(h.qd_filt[0]);   log["filt_knee"].append(h.qd_filt[1])
+        log["vest_x"].append(v_est[0]);         log["vest_z"].append(v_est[1])
+        log["vraw_x"].append(v_raw[0]);         log["vraw_z"].append(v_raw[1])
         log["grf"].append(rec["grf"]);          log["phase"].append(rec["phase"])
         log["tau3"].append(rec["tau3"]);        log["tau4"].append(rec["tau4"])
         log["contact"].append(bool(rec["grf"] > FZ_CONTACT))
@@ -86,8 +98,8 @@ def main():
     tmaxH = twin.kT * twin.NH * twin.IMAX     # torque max cadera
     tmaxK = twin.kT * twin.NK * twin.IMAX     # torque max rodilla
 
-    fig, ax = plt.subplots(3, 2, figsize=(13, 11))
-    fig.suptitle("HOPPY Gemelo Digital — Análisis Completo de Señales (Rúbrica Fase 5)",
+    fig, ax = plt.subplots(4, 2, figsize=(13, 14))
+    fig.suptitle("HOPPY Gemelo Digital - Análisis Completo de Señales (Rúbrica Fase 5)",
                  fontsize=14, fontweight="bold")
 
     def shade(a):                              # sombra verde donde GRF > 2 N (apoyo)
@@ -119,15 +131,25 @@ def main():
     a.set_title("Velocidad estimada filtrada (λ=10) vs cruda")
     a.legend(loc="best", fontsize=7); a.grid(alpha=0.3)
 
-    # [1,1] GRF
+    # [1,1] velocidad CARTESIANA del pie: estimada (J·qd_filt) vs cruda (J·qvel)
     a = ax[1, 1]; shade(a)
+    a.plot(t, D["vraw_x"], color="gray", alpha=0.3, ls="--", label="cruda tangencial")
+    a.plot(t, D["vraw_z"], color="dimgray", alpha=0.3, ls="--", label="cruda vertical")
+    a.plot(t, D["vest_x"], color="C0", label="estimada tangencial (J·q̇_filt)")
+    a.plot(t, D["vest_z"], color="C2", label="estimada vertical (J·q̇_filt)")
+    a.set_ylabel("Vel. cartesiana pie (m/s)")
+    a.set_title("Velocidad cartesiana estimada del pie (frame de cadera)")
+    a.legend(loc="best", fontsize=7); a.grid(alpha=0.3)
+
+    # [2,0] GRF
+    a = ax[2, 0]; shade(a)
     a.plot(t, D["grf"], color="C2", label="GRF vertical")
     a.axhline(0, color="k", lw=0.8)
     a.set_ylabel("GRF (N)"); a.set_title("Fuerza de contacto (GRF)")
     a.legend(loc="best"); a.grid(alpha=0.3)
 
-    # [2,0] torques de control + limites
-    a = ax[2, 0]; shade(a)
+    # [2,1] torques de control + limites
+    a = ax[2, 1]; shade(a)
     a.plot(t, D["tau3"], color="C0", label="τ cadera")
     a.plot(t, D["tau4"], color="C3", label="τ rodilla")
     a.axhline(tmaxH, color="C0", ls=":", lw=1.0); a.axhline(-tmaxH, color="C0", ls=":", lw=1.0)
@@ -136,8 +158,8 @@ def main():
     a.set_title("Torques de control (± τ_max = kT·N·Imax punteado)")
     a.legend(loc="best", fontsize=8); a.grid(alpha=0.3)
 
-    # [2,1] estado FSM (fondo azul=vuelo, verde=apoyo)
-    a = ax[2, 1]
+    # [3,0] estado FSM (fondo azul=vuelo, verde=apoyo)
+    a = ax[3, 0]
     for (i0, i1) in _segments(D["phase"] == 1):
         a.axvspan(t[i0], t[min(i1, len(t) - 1)], color="green", alpha=0.15, lw=0)
     for (i0, i1) in _segments(D["phase"] == 0):
@@ -147,6 +169,7 @@ def main():
     a.set_xlabel("Tiempo (s)"); a.set_ylabel("Estado FSM")
     a.set_title("Máquina de estados (FSM)")
     a.legend(loc="best", fontsize=8); a.grid(alpha=0.3)
+    ax[3, 1].axis("off")
 
     os.makedirs(FIGDIR, exist_ok=True)
     out = os.path.join(FIGDIR, "señales_rubrica.png")

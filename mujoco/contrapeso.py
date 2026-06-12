@@ -1,4 +1,4 @@
-"""contrapeso.py — cálculo del contrapeso del boom de HOPPY por BALANCE DE MOMENTOS.
+"""contrapeso.py - cálculo del contrapeso del boom de HOPPY por BALANCE DE MOMENTOS.
 
 Por qué hace falta:
   El boom es una palanca que pivota en el gantry. De un lado cuelga el HOPPY (pierna +
@@ -12,7 +12,7 @@ Física (balance de momentos respecto al pivote, boom horizontal):
   - d_hopper = brazo del hopper     (pivote -> CoM del lado hopper)
   - M_hopper = masa total que cuelga del lado del hopper
 
-OJO — un saltarín NO se balancea al 100%: el balance total deja al pie SIN "peso de cuerpo"
+OJO - un saltarín NO se balancea al 100%: el balance total deja al pie SIN "peso de cuerpo"
 contra el cual rebotar y el empuje sobrelanza el boom (en sim, 100% -> explota a ~68 cm). Se
 deja un RESIDUAL (~24%) de desbalance = el peso efectivo que la pierna bota. Sweet spot ~76%.
 
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     print(f"[SIM] medido: M_hopper={Mh:.2f} kg a d_hopper={dh:.2f} m\n")
     reporte("SIM (brazo cw = 0.35 m, el de tu boom)", mom, 0.35)
 
-    # 2) ROBOT FÍSICO — EDITA con tus medidas reales:
+    # 2) ROBOT FÍSICO - EDITA con tus medidas reales:
     print()
     FISICO = dict(
         M_hopper=2.075,   # kg  <-- MEDIDO: robot (hopper) conectado al tubo/gantry = 2075 g

@@ -1,4 +1,4 @@
-"""hoppy_urdf.py — el URDF real de HOPPY como modulo compatible con controller.py.
+"""hoppy_urdf.py - el URDF real de HOPPY como modulo compatible con controller.py.
 
 Toma el URDF importado (load_hoppy_urdf), renombra los joints joint1..4 -> theta1..4
 (opcion B: asi controller.py los encuentra sin cambios) y le INYECTA lo que el control

@@ -1,4 +1,4 @@
-"""log_hop_urdf.py — registra 10 s del salto del HOPPY URDF a CSV (hop_urdf_log.csv).
+"""log_hop_urdf.py - registra 10 s del salto del HOPPY URDF a CSV (hop_urdf_log.csv).
 
 Una fila por paso (1 kHz) tras asentar 1 s. Columnas: tiempo, angulos/velocidades de
 junta, posicion del pie y del cuerpo, GRF (mj_contactForce normal y sensor touch), torques

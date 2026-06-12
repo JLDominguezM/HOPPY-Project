@@ -17,7 +17,7 @@ RANGES = dict(
     krh=(0.0, 0.18), p_toe_z=(-0.26, -0.10), Tst=(0.12, 0.30),
     fz_scale=(0.8, 3.2), fx_scale=(0.4, 3.5), blend=(0.006, 0.03),
     grf_liftoff=(1.0, 5.0), j_damp=(0.0, 0.4), solref0=(0.006, 0.02),
-    vx_d=(-1.2, 1.2),   # velocidad de avance deseada (Raibert) — el knob que faltaba
+    vx_d=(-1.2, 1.2),   # velocidad de avance deseada (Raibert) - el knob que faltaba
     kp_st=(0.0, 0.4), kd_st=(0.0, 0.3),   # autoridad de control en apoyo
     q3_ref=(-0.3, 0.5), q4_ref=(-0.8, 0.1),   # rodilla flexiona (cargar) y extiende (empujar/despegar)
 )

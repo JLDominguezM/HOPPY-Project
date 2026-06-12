@@ -1,4 +1,4 @@
-"""urdf_tune.py — busqueda aleatoria de la marcha para el HOPPY URDF real (hoppy_urdf).
+"""urdf_tune.py - busqueda aleatoria de la marcha para el HOPPY URDF real (hoppy_urdf).
 
 El gait del twin NO transfiere (masas/inercias reales del CAD, 3.43 kg); aqui se
 re-afina desde cero. Fitness por prioridad:

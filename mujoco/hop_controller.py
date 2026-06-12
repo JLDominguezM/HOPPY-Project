@@ -1,4 +1,4 @@
-"""hop_controller.py — controlador de salto FSM simple para el HOPPY URDF real.
+"""hop_controller.py - controlador de salto FSM simple para el HOPPY URDF real.
 
 INDEPENDIENTE de controller.py (el control hibrido del twin NO transfiere al URDF; ~800
 configs de busqueda dieron 0 cm). Basado en el test mecanico: torque directo hip=-, knee=+

@@ -1,4 +1,4 @@
-"""hop_tune.py — mini random search del hop_controller (5 params clave).
+"""hop_tune.py - mini random search del hop_controller (5 params clave).
 
 Metrica = subida del cuerpo sobre el reposo asentado (cm) + bonus por vuelos sostenidos.
 El modelo se construye UNA vez (los 5 params son del controlador, no del XML), asi que

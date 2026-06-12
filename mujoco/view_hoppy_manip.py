@@ -1,4 +1,4 @@
-"""Visor MANIPULABLE del HOPPY (URDF real de SolidWorks) — mueve cada junta con sliders.
+"""Visor MANIPULABLE del HOPPY (URDF real de SolidWorks) - mueve cada junta con sliders.
 
 Toma el URDF importado (load_hoppy_urdf), lo exporta a MJCF y le agrega:
   - 4 actuadores de POSICION (joint1..4) -> aparecen como sliders en el panel Control

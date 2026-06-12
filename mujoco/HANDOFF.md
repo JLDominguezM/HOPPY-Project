@@ -1,7 +1,11 @@
-# HANDOFF — Simulación MuJoCo de HOPPY (estado al 2026-06-05)
+# HANDOFF - Simulación MuJoCo de HOPPY (estado al 2026-06-05)
 
 Documento para retomar el trabajo en otra sesión. Estado **actual** exacto, qué se
 logró, qué falta, cómo se hizo y dónde está cada cosa. Lee la §0 primero.
+
+> **ACTUALIZACIÓN 2026-06-09:** la sim forward quedó lista (`mujoco/CONTROL_FORWARD.md`,
+> `view_hop_urdf.py --viewer`) y ya se pasó al **robot físico**: la puesta a punto del firmware
+> está COMPLETA y se escribió el controlador aéreo. Ver **`../Microcontroller/HANDOFF_FIRMWARE.md`**.b
 
 ---
 
@@ -17,15 +21,15 @@ Hay **DOS modelos** en `mujoco/`:
    del CAD/STEP + datasheets + `List of nominal parameters.pdf`).
 
 **El gemelo HOY (config en `twin.DEFAULTS`, `view_twin.py` con pierna procedural):**
-- ✅ **SALTA de verdad:** 11 saltos sostenidos, cuerpo **+8.8 cm**, **pie despega 6.3 cm
+- **SALTA de verdad:** 11 saltos sostenidos, cuerpo **+8.8 cm**, **pie despega 6.3 cm
   (fase de vuelo real)**, **avanza 0.59 rad/s** (≈ una vuelta al poste cada ~11 s),
   ciclo estable, motores al límite **12 V / 9.2 A**.
-- ✅ **Pierna PROCEDURAL gris detallada** (placas IMP-8/9 + tubo TUB-1 + regatón negro,
+- **Pierna PROCEDURAL gris detallada** (placas IMP-8/9 + tubo TUB-1 + regatón negro,
   color housing) que **NUNCA se separa** al articular + 2 resortes-tendón dorados (visuales).
-- ✅ Gantry fijo + boom PVC + housing con masas/inercias/actuadores/sensores reales.
-- ⚠️ **El resorte 100% real (Ks=1.67 kN/m) NO permite saltar** (deja la rodilla casi
+- Gantry fijo + boom PVC + housing con masas/inercias/actuadores/sensores reales.
+- OJO: **El resorte 100% real (Ks=1.67 kN/m) NO permite saltar** (deja la rodilla casi
   rígida). El rebote del salto lo da un resorte de junta más suave (config seed23). Ver §3.
-- ⚠️ La **malla CAD 4-barras exacta NO se puede articular** sin partirse (las placas
+- OJO: La **malla CAD 4-barras exacta NO se puede articular** sin partirse (las placas
   cruzan la rodilla); queda solo para `view_twin_static` (reposo). Ver §3.
 
 **Correr el gemelo:**
@@ -61,15 +65,15 @@ BOOM_X0,BOOM_X1=-0.39,0.81   extremos del tubo PVC   BOOM_OD=0.0334 (1")
 
 **Masas (kg):** M_HOUSING=0.791, M_BOOM=0.481, M_MOTORS=0.870 (2× goBILDA 435 g),
 M_ELEC=0.150, M_THIGH=0.130, M_SHANK=0.100, M_YAW=0.060. link2 compuesto ≈ 2.29 kg.
-(El PDF da masas "oficiales" link3=0.656, link4=0.149 — twin usa estimaciones por STL.)
+(El PDF da masas "oficiales" link3=0.656, link4=0.149 - twin usa estimaciones por STL.)
 
 **Actuador goBILDA 5202-2402-0027 (datasheet):** N=26.9 (cadera y rodilla; **OJO:** el PDF
-dice N_K=28.8 para la rodilla, twin usa 26.9 en ambas — discrepancia menor pendiente),
+dice N_K=28.8 para la rodilla, twin usa 26.9 en ambas - discrepancia menor pendiente),
 Rw=1.3, kT=0.0135, kv=0.0186, **VMAX=12, IMAX=9.2 A** (no 30). I_ROTOR=7e-6, armadura N²·Ir.
 
 **Rangos de junta:** theta3 (cadera) `range="-0.5 0.9"`, theta4 (rodilla) `range="-1.3 0.4"`.
 
-**`twin.DEFAULTS` (la marcha que SALTA — seed23):**
+**`twin.DEFAULTS` (la marcha que SALTA - seed23):**
 ```
 solref0=0.0191, j_damp=0.1494,
 knee_stiff=0.0948, knee_ref=0.0088, knee_damp=0.0, spring_scale=0.0,
@@ -108,7 +112,7 @@ para no repetir caminos:
    **CRUZAN la rodilla cinemática** (que está a LH=96 mm de la cadera). Cualquier modelo
    "muslo rígido + pantorrilla rígida + 1 junta" **parte esas placas**: la mitad de abajo
    rota con la pantorrilla y se separa de la de arriba. **Es físicamente inevitable con la
-   malla CAD** — el knee real es un 4-barras (las barras cruzan la junta).
+   malla CAD** - el knee real es un 4-barras (las barras cruzan la junta).
 7. **Decisión final del usuario: pierna PROCEDURAL bien hecha + que salte de verdad.**
    - `view_twin` usa la **procedural gris** (generada para calzar las juntas → nunca se
      separa). La malla CAD detallada queda en `view_twin_static` (reposo, donde sí conecta).
@@ -137,7 +141,7 @@ Se modeló como **2 tendones `<spatial>`** muslo(link3)↔palanca(link4), `stiff
 **Hallazgo:** con `spring_scale=1.0` (Ks real) la rodilla queda **casi rígida** → el cuerpo
 bobea ~16 mm **SIN vuelo** (el pie no despega), casi no avanza. El HOPPY real salta con este
 resorte usando el controlador sofisticado del paper; el port MATLAB + búsqueda aleatoria **NO
-lo logra**. El tuner siempre pide bajar el resorte (`spring_scale`→0.16–0.42) y aun así no
+lo logra**. El tuner siempre pide bajar el resorte (`spring_scale`→0.16-0.42) y aun así no
 hay vuelo limpio.
 
 **Por eso el estado final usa `spring_scale=0.0`** (tendones VISUALES) + el resorte de JUNTA
@@ -164,7 +168,7 @@ eso baja el salto.
 - `/tmp/hoppy.glb` = ensamble completo (328 piezas, nombres genéricos NAUO, **en metros**).
   Regenerar: `cascadio.step_to_glb('/tmp/HOPPY-E0.STEP', '/tmp/hoppy.glb', tol_linear=2.0)`.
 
-**⚠️ EJE VERTICAL = Y_cad (no Z).** El GLB de glTF es **Y-UP**. `build_twin_meshes.py` y
+**OJO: EJE VERTICAL = Y_cad (no Z).** El GLB de glTF es **Y-UP**. `build_twin_meshes.py` y
 `twin.py` usan `model_z = (y_cad - py) + HB`, `model_x = -(x_cad - px)`, `model_y = z_cad - pz`,
 con `PIVOT_CAD=[1.559, 1.312, 1.349]`. Con Z-up todo salía **rotado 90°** (bug que el usuario
 cazó). Con Y-up la base del gantry cae al piso y el pivote queda a 0.250 m (coincide con la foto).
@@ -184,7 +188,7 @@ se modela el lazo cerrado exacto.
 
 ---
 
-## 5. AVANCE ALREDEDOR DEL POSTE (resuelto — el knob `vx_d`)
+## 5. AVANCE ALREDEDOR DEL POSTE (resuelto - el knob `vx_d`)
 
 El gemelo saltaba **en sitio** (no avanzaba). Investigación 3-agentes (2026-06-04) + paper
 (arXiv 2010.14580): HOPPY **avanza por la componente HORIZONTAL de la fuerza de apoyo** (Fx
@@ -217,7 +221,7 @@ Mientras tanto, la **pierna procedural** evita el problema (se genera a la medid
 
 ---
 
-## 7. MODELO ABSTRACTO (histórico, intacto) — `tune_eval.py`
+## 7. MODELO ABSTRACTO (histórico, intacto) - `tune_eval.py`
 
 La **simulación física original** está LISTA y verificada: cumple las 5 fases de la rúbrica y
 replica el MATLAB. Modelo anclado a `Simulator_MATLAB/fcns/get_params.m` (HB=0.1965, LB=0.556,
@@ -257,9 +261,9 @@ confiar en métricas que cuentan despegue del pie.**
 1. **(Pulido)** Ajustar look de la pierna procedural si el usuario quiere (colores, grosor
    tubo/placas, tamaño de los resortes-tendón). Editar el branch `elif vis:` en `twin.make_xml`.
 2. **(Fidelidad del resorte)** Si se quiere el serie-elástico real saltando: implementar el
-   control híbrido del paper (no búsqueda aleatoria) — opción (b) de §3.
+   control híbrido del paper (no búsqueda aleatoria) - opción (b) de §3.
 3. **(Malla CAD que articule)** Modelar el 4-barras con lazo cerrado (IMP-8/9/12/13 como
-   cuerpos + equality `connect`). Requiere los pivotes exactos (§6) — pedir al usuario las
+   cuerpos + equality `connect`). Requiere los pivotes exactos (§6) - pedir al usuario las
    coordenadas del CAD o un emparejamiento robusto.
 4. **(Menor)** Reconciliar N_K: el PDF dice 28.8 (rodilla), twin usa 26.9. Pesar componentes
    reales para las masas (twin estima por STL; el PDF da link3=0.656, link4=0.149).
@@ -277,12 +281,12 @@ confiar en métricas que cuentan despegue del pie.**
 - **Autor siempre JLDominguezM, SIN atribución de IA** (nada de "Co-Authored-By: Claude" ni
   firmas del modelo en commits/tags/PR). Mensajes en imperativo, como escritos por persona.
 - **El reporte LaTeX** (`~/ImplementacionRobotica/reporte/*.tex`) va aparte y **NO se commitea**.
-- El correo del sistema `daniel-hinojosa09@outlook.com` es un ALIAS engañoso — el usuario es
+- El correo del sistema `daniel-hinojosa09@outlook.com` es un ALIAS engañoso - el usuario es
   **José Luis Domínguez Morales** (A01285873@tec.mx). Nunca usar el alias para autoría.
 
 ---
 
-## Sesión Jun 5-6 2026 — URDF Real + Salto Limpio
+## Sesión Jun 5-6 2026 - URDF Real + Salto Limpio
 
 ### Lo que se hizo (en orden cronológico)
 
@@ -306,7 +310,7 @@ confiar en métricas que cuentan despegue del pie.**
 4. **Primer intento: controller.py con el URDF** (Jun 6 madrugada)
    - hoppy_urdf.py creado (análogo a twin.py para el URDF)
    - view_hoppy_jump.py: viewer del URDF con controlador híbrido
-   - RESULTADO: 0.0 cm — el gait del twin no transfiere al URDF
+   - RESULTADO: 0.0 cm - el gait del twin no transfiere al URDF
      (masas distintas: twin=2.58 kg vs URDF=3.43 kg, geometría real)
    - Test mecánico: torque constante hip=−5/knee=+5 → +23.6 cm
      → confirmó que el mecanismo SÍ puede saltar
@@ -315,7 +319,7 @@ confiar en métricas que cuentan despegue del pie.**
    - FSM 3 estados: CARGA → EMPUJE → VUELO
    - EMPUJE: torque directo hip=−TAU, knee=+TAU (signos del test mec.)
    - hop_tune.py: random search 5 params, 300 iters
-   - RESULTADO v1: 18.8 cm — pero irreal (atravesaba piso 4 cm,
+   - RESULTADO v1: 18.8 cm - pero irreal (atravesaba piso 4 cm,
      rodilla golpeaba límite −1.3, control bang-bang)
 
 6. **Diagnóstico y corrección del salto** (Jun 6)
@@ -332,37 +336,37 @@ confiar en métricas que cuentan despegue del pie.**
 
 | Modelo | Salta | Altura | Controlador | Geometría |
 |---|---|---|---|---|
-| Abstracto (tune_eval) | ✅ | 7.2 cm | Híbrido rúbrica | Simplificada |
-| Gemelo CAD (twin.py) | ✅ | 8.8 cm | Híbrido rúbrica | CAD procedural |
-| URDF real (hoppy_urdf) | ✅ | 11.1 cm | FSM propio (hop_controller) | CAD SolidWorks real |
+| Abstracto (tune_eval) | si | 7.2 cm | Híbrido rúbrica | Simplificada |
+| Gemelo CAD (twin.py) | si | 8.8 cm | Híbrido rúbrica | CAD procedural |
+| URDF real (hoppy_urdf) | si | 11.1 cm | FSM propio (hop_controller) | CAD SolidWorks real |
 
 > Las alturas son **excursión vertical del cuerpo** (pico − valle del ciclo). El despegue
-> real del pie sobre el piso es menor (URDF ≈ 3.8 cm, gemelo ≈ 6.3 cm) — ver §0.
+> real del pie sobre el piso es menor (URDF ≈ 3.8 cm, gemelo ≈ 6.3 cm) - ver §0.
 
 ### Archivos clave añadidos esta sesión
 
 ```
-mujoco/hoppy_urdf.py         — URDF como módulo compatible con controller.py
-mujoco/hop_controller.py     — FSM 3 estados para el URDF
-mujoco/hop_tune.py           — tuner random search con penalización física
-mujoco/view_hop_urdf.py      — viewer del URDF saltando
-mujoco/view_hoppy_manip.py   — viewer con sliders por joint
-mujoco/load_hoppy_urdf.py    — loader URDF→MuJoCo con decimación de mallas
-mujoco/HOPPY-E0-final/       — paquete URDF + meshes del SolidWorks
-figuras/hop_urdf_limpio.mp4  — video 10 s salto limpio
-figuras/hop_apex_lateral.png — render apex vista lateral
-figuras/hop_apex_34.png      — render apex vista 3/4
-figuras/diagnostico_salto.png — diagnóstico completo del ciclo
-figuras/señales_rubrica.png  — 6 subplots rúbrica Fase 5
+mujoco/hoppy_urdf.py         - URDF como módulo compatible con controller.py
+mujoco/hop_controller.py     - FSM 3 estados para el URDF
+mujoco/hop_tune.py           - tuner random search con penalización física
+mujoco/view_hop_urdf.py      - viewer del URDF saltando
+mujoco/view_hoppy_manip.py   - viewer con sliders por joint
+mujoco/load_hoppy_urdf.py    - loader URDF→MuJoCo con decimación de mallas
+mujoco/HOPPY-E0-final/       - paquete URDF + meshes del SolidWorks
+figuras/hop_urdf_limpio.mp4  - video 10 s salto limpio
+figuras/hop_apex_lateral.png - render apex vista lateral
+figuras/hop_apex_34.png      - render apex vista 3/4
+figuras/diagnostico_salto.png - diagnóstico completo del ciclo
+figuras/señales_rubrica.png  - 6 subplots rúbrica Fase 5
 ```
 
 ### Discrepancias conocidas (pendientes o aceptadas)
 
 - spring_scale=0.0 en twin.py: resorte real desactivado, rebote por
   knee_stiff (documentado en §3 anterior)
-- N_K twin: corregido a 28.8 esta sesión ✓
+- N_K twin: corregido a 28.8 esta sesión
 - Masa link3 twin: 0.130 vs 0.656 kg PDF (motor agrupado en link2)
-- URDF: controlador propio (no el híbrido de la rúbrica) — el híbrido
+- URDF: controlador propio (no el híbrido de la rúbrica) - el híbrido
   no transfiere por diferencia de masas/geometría
 - q4 gemelo: opera en [-0.17, +0.46] (no singular por geometría 4-barras)
   → chequeo no-crítico en verify.py (documentado)

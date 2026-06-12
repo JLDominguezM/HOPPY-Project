@@ -67,7 +67,7 @@ def make_figure(m, d):
              ("Vista frontal (YZ)", 1, 2, "Y (m)", "Z (m)"),
              ("Vista superior (XY)", 0, 1, "X (m)", "Y (m)")]
     fig, ax = plt.subplots(1, 3, figsize=(18, 6))
-    fig.suptitle("HOPPY Gemelo — Conexiones de links (bodies = puntos etiquetados, "
+    fig.suptitle("HOPPY Gemelo - Conexiones de links (bodies = puntos etiquetados, "
                  "geoms = circulos por body)  [qpos = 0]", fontsize=13, fontweight="bold")
 
     for k, (title, ia, ib, xl, yl) in enumerate(views):

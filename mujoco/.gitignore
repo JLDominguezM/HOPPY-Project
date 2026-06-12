@@ -19,3 +19,7 @@ urdf_best.json
 urdf_best_candidate.json
 urdf_tune.log
 urdf_tune.pid
+
+# caches y logs generados (regenerables al correr los scripts)
+.cache/
+hop_urdf_log.csv

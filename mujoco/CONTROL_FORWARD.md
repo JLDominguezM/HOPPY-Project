@@ -1,4 +1,4 @@
-# HOPPY URDF — salto hacia ADELANTE con el controlador REAL
+# HOPPY URDF - salto hacia ADELANTE con el controlador REAL
 
 `python3 view_hop_urdf.py --viewer` ahora salta **hacia adelante** (al lado **sin** pierna)
 usando el **controlador híbrido real** (port fiel del simulador MATLAB del paper = el control
@@ -12,10 +12,10 @@ que correrá en la LaunchPad F28379D), con las **constantes reales** y el boom *
 - **Pie/pose:** `p_toe_z=-0.18` (aterriza más extendida, pantorrilla ~43° de la vertical, antes
   ~50°). La pierna se mantiene **idéntica al URDF real del CAD** (4 barras, resortes, sensor); el
   contacto físico es un punto en el **regatón al final del shank** (`FOOT_TIP`), la geometría
-  real — así la cinemática del sim coincide con el robot y las ganancias transfieren. **Sensor de
+  real - así la cinemática del sim coincide con el robot y las ganancias transfieren. **Sensor de
   pie:** el firmware detecta fase por `analog_in[0] >= analog_limit` (cuánto se retrae/comprime el
   sensor cruza un umbral); el sim la detecta por **fuerza de contacto > umbral**, el análogo
-  directo — el mecanismo que importa para el control está modelado, aunque la malla no muestre el
+  directo - el mecanismo que importa para el control está modelado, aunque la malla no muestre el
   sensor moviéndose. Ver `figuras/foot_revertido.png`. (Se probó añadir una punta/spike o
   simplificar la malla, pero eso cambiaba la geometría real → descartado.)
 
@@ -34,12 +34,12 @@ que correrá en la LaunchPad F28379D), con las **constantes reales** y el boom *
    con el motor real saturaba a 12 V y 0.1 cm de despegue). El HOPPY del paper y el modelo
    MATLAB (`rx2=−0.50`) están balanceados por diseño; por eso saltan.
 
-   **Cálculo del contrapeso (balance de momentos)** — ver `contrapeso.py`:
+   **Cálculo del contrapeso (balance de momentos)** - ver `contrapeso.py`:
    `M_cw · d_cw = M_hopper · d_hopper`. Desbalance medido en sim = **12.9 N·m** (M_hopper=2.38 kg
    a 0.55 m). A tu brazo real **d_cw = 0.35 m**: balance total = 3.77 kg, pero un saltarín NO se
    balancea al 100% (deja al pie sin "peso de cuerpo" → sobrelanza, en sim explota a 68 cm). El
    sweet spot es **~76% de balance = 2.86 kg @ 0.35 m** (deja ~3 N·m de peso efectivo en la
-   pierna). Eso usa `hoppy_urdf.FORWARD` y salta limpio. Margen 2.6–3.2 kg.
+   pierna). Eso usa `hoppy_urdf.FORWARD` y salta limpio. Margen 2.6-3.2 kg.
 
    > **IMPORTANTE para el físico:** el robot real necesita ese balanceo. El BOM del gantry no
    > trae contrapeso. Para TU boom (hopper a ~85 cm, no 55 cm como el CAD), el momento es mayor:
@@ -54,7 +54,7 @@ Todas salen de `Simulator_MATLAB/fcns/get_params.m` y `dyn_aerial/dyn_stance.m`.
 
 | Concepto | Sim / MATLAB | Firmware `cpu01_main.c` |
 |---|---|---|
-| Dimensiones pierna | LH=0.096, DK=0.052, LK=0.1545 | `LH .0960`, `DK .0520`, `LK .1550` (ya están) |
+| Dimensiones pierna | LH=0.096, DK=0.052, LK=0.1545 | `LH.0960`, `DK.0520`, `LK.1550` (ya están) |
 | Fase | contacto del pie | `get_phase()` (`analog_in[0] >= analog_limit`) |
 | **Aéreo**: PD cartesiano del pie | `Kp_sw=150, Kd_sw=5` (N/m), `u=Jᵀ·F` | equivale a `pose_to_joint_space()`→`q_ref` + PD `Kp_a/Kd_a` |
 | Colocación de pie (Raibert) | `p_des=[Krh·vx, −0.15]`, `Krh=0.10` | `pos_des[0]=Krh*vx; pos_des[1]=-0.15;` antes de `pose_to_joint_space()` |

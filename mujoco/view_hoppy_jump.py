@@ -2,7 +2,7 @@
 
 Uso:  python3 view_hoppy_jump.py [--viewer]
 
-ESTADO (honesto): la integracion CORRE — compila, sin NaN, contacto de pie y actuadores
+ESTADO (honesto): la integracion CORRE - compila, sin NaN, contacto de pie y actuadores
 hip/knee OK, y el frame de cadera ya esta corregido a la convencion del controlador
 (Z=vertical). PERO el gait afinado del twin NO transfiere al URDF (masas/inercias reales
 distintas): el cuerpo aun NO despega. Falta re-afinar la marcha (busqueda tipo twin_tune
@@ -23,7 +23,7 @@ def main():
             h.step()
             if np.any(np.isnan(h.d.qpos)):
                 print("NaN"); return
-        print("headless 2000 pasos OK (corre sin NaN; aun NO salta — ver reporte).")
+        print("headless 2000 pasos OK (corre sin NaN; aun NO salta - ver reporte).")
         print("para verlo en 3D:  python3 view_hoppy_jump.py --viewer")
         return
     from mujoco import viewer as mjv

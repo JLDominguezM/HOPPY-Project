@@ -136,7 +136,7 @@ def _inertial(pos, m, I):
 # control: el control de vuelo usaba krh*vx sin vx_d -> amortiguaba el yaw a 0. Con vx_d!=0
 # regula vx hacia vx_d y avanza. Salto 4.9cm, pie despega 4.3cm, 35% vuelo, motores al
 # limite 12V/9.2A (sin margen; un contrapeso ~2kg da mas margen pero NO es necesario para
-# avanzar — ver HANDOFF y twin_tune). q3 limitado a 0.3-1.5 rad (rango realista).
+# avanzar - ver HANDOFF y twin_tune). q3 limitado a 0.3-1.5 rad (rango realista).
 DEFAULTS = dict(
     solref0=0.0191, j_damp=0.1494,
     knee_stiff=0.0948, knee_ref=0.0088, knee_damp=0.0, spring_scale=0.0,  # resorte de JUNTA; tendon = visual
