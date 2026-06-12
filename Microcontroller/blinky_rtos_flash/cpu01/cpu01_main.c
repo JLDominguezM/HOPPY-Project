@@ -175,7 +175,7 @@ long int cnt        = 0;            // time counter
 int posref1dir = 0; // TODO comment out later - just used in initial demo
 int posref2dir = 0; // TODO comment out later - just used in initial demo
 
-/****** PRUEBA LENTA DE LA PIERNA — sujetala en el aire ******/
+/****** PRUEBA LENTA DE LA PIERNA - sujetala en el aire ******/
 int   MOTORS_OFF = 1;            // 1 = solo verifica la IK (q_ref) sin mover; 0 = mueve la pierna
                                  // (arranca en 1 por seguridad: ponlo en 0 EN VIVO en Expressions)
 // ===== MODELO DEL MOTOR goBILDA (Ec.18 del paper; los usa prevent_saturation) =====
@@ -204,7 +204,7 @@ float ramp_rate  = 0.15;         // rad/s -> MUY lento (ya no se usa en el aereo
 // + rodilla en su TOPE DE EXTENSION (sin resorte peleando). Ahi se escriben QPOSCNT=0.
 // CADERA: +q0 = muslo hacia adelante. Offset del cero = 0 (muslo vertical EN el cero).
 float beta_off   = 0.0;
-// RODILLA — MAPA DEL 4-BARRAS:  q1_FK = KA*e^2 + KB*e + KC,  e = q_now[1] (encoder).
+// RODILLA - MAPA DEL 4-BARRAS:  q1_FK = KA*e^2 + KB*e + KC,  e = q_now[1] (encoder).
 // q1_FK = angulo efectivo rodilla->pie respecto al muslo, ADELANTE positivo. Flexionar
 // (e<0) AUMENTA q1_FK. |KA|,|KB| = forma medida en la calibracion de 4 puntos (la relacion
 // efectiva varia ~1.5 extension -> ~0.7 flexion); signo volteado por la morfologia espejo.
@@ -231,7 +231,7 @@ float wp[NWP][2] = {
 };
 int   wp_i = 0;  float t_wp = 0.0;
 
-/****** ETAPA 2 — CONTROL DE APOYO (banco): empuje GRF Bezier  u = -J^T*[Fx;Fz] + PD suave ******/
+/****** ETAPA 2 - CONTROL DE APOYO (banco): empuje GRF Bezier  u = -J^T*[Fx;Fz] + PD suave ******/
 // Port fiel de la Ec.19 del paper (controller.py / Simulator_MATLAB, ver mujoco/CONTROL_FORWARD.md).
 // El empuje dura Tst y el perfil de fuerza [Fx;Fz] (N, frame de cadera: x adelante, z arriba)
 // es un Bezier de 4to orden. El torque sale en espacio FK y se mapea a motor: cadera 1:1,
@@ -252,10 +252,10 @@ float blend_ms = 10.0;        // mezcla aereo->apoyo (Ec.20) para no meter un es
 int   st_active = 0;          // (estado) 1 mientras empuja
 float st_t = 0.0;             // (estado) tiempo dentro del empuje (s)
 float qd_st_fk[2] = {0.0, 0.0};  // pose FK capturada al iniciar el empuje (ref del PD suave)
-float F_des[2]  = {0.0, 0.0};    // [Fx;Fz] actuales del Bezier (N) — mirar en Expressions
+float F_des[2]  = {0.0, 0.0};    // [Fx;Fz] actuales del Bezier (N) - mirar en Expressions
 float tau_fk[2] = {0.0, 0.0};    // torque de apoyo en espacio FK (N*m)
 float u_air[2]  = {0.0, 0.0};    // torque del PD aereo (espacio motor)
-float u_st[2]   = {0.0, 0.0};    // torque de apoyo en espacio MOTOR (N*m) — mirar en dry-run
+float u_st[2]   = {0.0, 0.0};    // torque de apoyo en espacio MOTOR (N*m) - mirar en dry-run
 int   phase_prev = 0;            // para el flanco de subida del sensor (st_sensor)
 // Filtro de velocidad (= Fase 5 de la sim, lambda=10 rad/s): permite usar Kd sin zumbido.
 float vel_lambda = 10.0;      // ancho de banda (rad/s). Subir EN VIVO (20-30) si la D va lenta
@@ -267,6 +267,22 @@ float pk_Fz = 0.0;            // max F_des[1] comandada (N)
 float pk_pwm[2] = {0.0, 0.0}; // max |pwm| FINAL enviado a cada motor (post-saturacion)
 float pk_e_min = 0.0;         // min/max de q_now[1] durante el empuje: cuanto VIAJO la
 float pk_e_max = 0.0;         // rodilla (pk_e_max cerca de 0 = topo en su extension)
+
+/****** ETAPA 3 - JUMP_MODE: salto continuo por sensor de pie (FSM aereo<->apoyo) ******/
+// AEREO: el PD lleva el pie a la pose de aterrizaje (traj_x0, traj_depth) - colocacion FIJA
+//   (sin encoder de boom no hay Raibert; el avance lo fija Fx, como la sim con vx_d=0).
+// TOUCHDOWN: flanco 0->1 del sensor de pie con t_air >= lo_debounce -> empuje GRF (Etapa 2).
+// LIFTOFF: sensor suelto tras td_min_stance (el analogo del "GRF < umbral" del paper),
+//   o fin de Tst -> regresa al aereo y el PD recoge la pierna.
+// MOTORS_OFF y u_lim_test siguen mandando. Sin contrapeso apenas despega ("botecitos"),
+// pero el ciclo completo sensor->empuje->recoger->caer->sensor se valida igual.
+int   JUMP_MODE = 0;          // 1 = salto continuo (defaults seguros: arranca apagado)
+float lo_debounce  = 0.04;    // s minimos en aereo antes de aceptar touchdown (anti-rebote)
+float td_min_stance = 0.05;   // s minimos de apoyo antes de permitir liftoff temprano
+long  n_hops = 0;             // contador de saltos disparados
+float t_air = 0.0;            // tiempo en aereo actual (s)
+float t_air_last = 0.0;       // DURACION DEL ULTIMO VUELO (s) - altura apex ~ g*t^2/8
+float t_st_last  = 0.0;       // duracion real del ultimo apoyo (s) - para afinar Tst
 /****************************************************** OUR ADDITION END **********************************************************/
 
 
@@ -438,7 +454,7 @@ void update_states(void)
 
 float bezier4(const float *c, float s)
 {
-    // Bezier de 4to orden (5 puntos de control), s en [0,1] — identico a twin.bezier de la sim
+    // Bezier de 4to orden (5 puntos de control), s en [0,1] - identico a twin.bezier de la sim
     float m, s2, m2;
     if (s < 0.0) s = 0.0;
     if (s > 1.0) s = 1.0;
@@ -457,12 +473,14 @@ void calculate_control(void)
     u_air[0] = Kp_test[0]*err_q[0] - Kd_test[0]*qdot_f[0];
     u_air[1] = Kp_test[1]*err_q[1] - Kd_test[1]*qdot_f[1];
 
-    // ETAPA 2 — disparo del empuje (manual st_go / ciclico st_auto / sensor de pie st_sensor)
-    if (!STANCE_TEST) {
+    // Disparo del empuje: manual st_go / ciclico st_auto / sensor st_sensor (Etapa 2),
+    // o TOUCHDOWN del salto continuo (JUMP_MODE, Etapa 3: flanco del sensor + anti-rebote)
+    if (!STANCE_TEST && !JUMP_MODE) {
         st_active = 0;
     } else if (!st_active) {
-        int rising = (phase && !phase_prev);
-        if (st_go || (st_auto && (cnt % st_period) == 0) || (st_sensor && rising)) {
+        int rising  = (phase && !phase_prev);
+        int jump_td = (JUMP_MODE && rising && t_air >= lo_debounce);
+        if (st_go || (st_auto && (cnt % st_period) == 0) || (st_sensor && rising) || jump_td) {
             st_go = 0;
             st_active = 1;
             st_t = 0.0;
@@ -471,6 +489,10 @@ void calculate_control(void)
             pk_Fz = 0.0;             // resetea los picos del empuje anterior
             pk_pwm[0] = 0.0;  pk_pwm[1] = 0.0;
             pk_e_min = q_now[1];  pk_e_max = q_now[1];
+            if (jump_td) {           // telemetria del salto: vuelo que acaba de terminar
+                n_hops++;
+                t_air_last = t_air;
+            }
         }
     }
     phase_prev = phase;
@@ -494,13 +516,20 @@ void calculate_control(void)
         u[0] = al*u_st[0] + (1.0 - al)*u_air[0];
         u[1] = al*u_st[1] + (1.0 - al)*u_air[1];
         st_t += T;
-        if (st_t >= Tst) {     // fin del empuje -> el PD aereo recoge la pierna a la cuclilla
-            st_active = 0;
-            F_des[0] = 0.0;  F_des[1] = 0.0;
+        {   // fin del empuje: por tiempo (Tst) o LIFTOFF temprano en JUMP_MODE (el sensor
+            // se suelta = el pie ya no toca; analogo del "GRF < umbral" del paper)
+            int early_lo = (JUMP_MODE && st_t >= td_min_stance && !phase);
+            if (st_t >= Tst || early_lo) {
+                st_active = 0;
+                t_st_last = st_t;     // duracion real del apoyo (afinar Tst con esto)
+                t_air = 0.0;          // arranca el cronometro de vuelo
+                F_des[0] = 0.0;  F_des[1] = 0.0;
+            }
         }
     } else {
         u[0] = u_air[0];
         u[1] = u_air[1];
+        t_air += T;   // tiempo en aereo (debounce del touchdown + t_air_last)
     }
 
     // MOTORS_OFF al FINAL: todo lo de arriba queda CALCULADO (dry-run: mirar F_des, tau_fk,
