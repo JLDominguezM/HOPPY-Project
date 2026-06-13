@@ -55,13 +55,15 @@ def main():
         ax.axis("off")
         if k < len(frames):
             ax.imshow(frames[k])
-            ax.set_title(f"t = {TIMES[k]} s    yaw = {yaws[k]:+.0f} deg", fontsize=10)
-    fig.suptitle("HOPPY real URDF model: hopping and turning around the post",
-                 fontsize=14, y=0.99)
-    fig.tight_layout()
+            # label inside the frame (white on the dark render) so titles never overlap
+            ax.text(0.035, 0.96, f"t = {TIMES[k]} s\nyaw = {yaws[k]:+.0f} deg",
+                    transform=ax.transAxes, va="top", ha="left", fontsize=9, color="white",
+                    bbox=dict(boxstyle="round,pad=0.3", fc="black", alpha=0.45, ec="none"))
+    fig.suptitle("HOPPY real URDF model: hopping and turning around the post", fontsize=14)
+    fig.subplots_adjust(left=0.01, right=0.99, top=0.93, bottom=0.01, wspace=0.04, hspace=0.04)
     os.makedirs("figuras", exist_ok=True)
     out = "figuras/hop_sequence.png"
-    fig.savefig(out, dpi=140, bbox_inches="tight")
+    fig.savefig(out, dpi=140)
     print(f"saved {out} ({len(frames)} frames)")
 
 
