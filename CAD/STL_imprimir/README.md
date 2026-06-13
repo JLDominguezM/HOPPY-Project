@@ -1,31 +1,39 @@
-# Piezas a imprimir - rediseño de clase
+# Parts to print (team redesign)
 
-**Importante:** este proyecto usa el **rediseño del equipo** (BOM de clase
-`BOM - HOPPY.xlsx`), **no** las piezas goBilda originales del repo. Las piezas a
-imprimir son **IMP-1 … IMP-30 + CASE 1/2**, no las piezas goBilda.
+This project uses the **team redesign** (see `HOPPY_BoM.xlsx`), not the original
+goBilda parts from the upstream kit. The parts to print are **IMP-1 ... IMP-30
+plus CASE 1/2**.
 
-> (Antes esta carpeta tenía STLs de las piezas goBilda originales; se quitaron porque
-> el rediseño parte de geometría propia, fabricada por impresión y tubos de PVC.)
+> An earlier version of this folder held STLs of the original goBilda parts. They
+> were removed because the redesign starts from our own geometry, fabricated by
+> 3D printing and PVC tubes.
 
-## Dónde está cada cosa
-- **Qué imprimir + cantidades + material (PLA/ABS) + gramos + tiempo:** checklist **#18**.
-- **Inventario completo de materiales (comprar/tener):** issue **#5**.
-- **STL listos para imprimir:** carpeta [`STL/`](STL/) con las **33 piezas del BOM**,
-  separadas por material: [`STL/PLA/`](STL/PLA/) (29 piezas) y [`STL/ABS/`](STL/ABS/)
-  (4: IMP-16, IMP-17, IMP-20, IMP-30). Listas para rebanar. No se incluyen `IMP-3`,
-  `IMP-6` (versiones enteras) ni `IMP-23` (fuera del BOM).
-- **Empezar por las largas** (>15 h c/u): IMP-3A, IMP-3B, IMP-6A, IMP-6B, IMP-27, IMP-28.
+## What is here
 
-## Resumen de impresión (del BOM)
-- **Total:** 33 piezas → **49 copias** · **~4.27 kg** de filamento · **~240 h** de impresión.
-- Mayoría **PLA**; en **ABS**: IMP-16, IMP-17, IMP-30, IMP-20.
-- Piezas largas (repartir entre impresoras): IMP-3A/3B y IMP-6A/6B (~22 h c/u),
-  IMP-27 (~18 h), IMP-28 (~15.5 h).
+- **Print-ready STLs:** the [`STL/`](STL/) folder holds the **33 parts from the
+  BOM**, split by material: [`STL/PLA/`](STL/PLA/) (29 parts) and
+  [`STL/ABS/`](STL/ABS/) (4 parts: IMP-16, IMP-17, IMP-20, IMP-30). They are
+  ready to slice. `IMP-3` and `IMP-6` (the whole-piece versions) and `IMP-23`
+  (outside the BOM) are not included.
+- **Start with the long parts** (more than 15 h each): IMP-3A, IMP-3B, IMP-6A,
+  IMP-6B, IMP-27, IMP-28.
 
-## Recomendaciones de impresión en PLA
-Como el robot recibe impactos al aterrizar, para el PLA:
-- Boquilla **210-220 °C**, perímetros lentos (**30-40 mm/s**), ventilador **40-70 %**.
-- **5 paredes**, relleno **50-70 %**, capas top/bottom 6.
-- **Orientar acostado** para que el impacto quede a lo largo de las capas (no delamine).
-- Insertos térmicos M2/M3/M4 → calentar con cautín e insertar; no imprimir roscas.
-- Empezar pruebas con fuerza de salto baja; tener repuestos de las piezas de la pata.
+## Print summary (from the BOM)
+
+- **Total:** 33 parts, **49 copies**, about **4.27 kg** of filament and **240 h**
+  of printing.
+- Most parts are **PLA**. In **ABS**: IMP-16, IMP-17, IMP-20, IMP-30.
+- Long parts (spread them across printers): IMP-3A/3B and IMP-6A/6B (about 22 h
+  each), IMP-27 (about 18 h), IMP-28 (about 15.5 h).
+
+## PLA print recommendations
+
+The robot takes impacts on landing, so for PLA:
+
+- Nozzle **210-220 C**, slow perimeters (**30-40 mm/s**), fan **40-70 %**.
+- **5 walls**, infill **50-70 %**, 6 top/bottom layers.
+- **Print lying down** so the impact runs along the layers and does not
+  delaminate.
+- M2/M3/M4 heat-set inserts: heat with a soldering iron and press in; do not
+  print threads.
+- Start tests with a low hop force, and keep spares of the leg parts.

@@ -1,0 +1,46 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below, and also cite the upstream HOPPY kit."
+title: "HOPPY redesign: MuJoCo simulation and physical implementation"
+abstract: >-
+  A one-legged hopping robot on a rotating boom, redesigned from the HOPPY
+  educational kit. Includes three MuJoCo models that share a hybrid 1 kHz
+  controller (validated against the original MATLAB simulator), a mechanical
+  redesign with a bird-type four-bar leg and 3D-printed parts, and C2000
+  firmware that achieves autonomous continuous hopping.
+type: software
+authors:
+  - given-names: "José Luis"
+    family-names: "Domínguez Morales"
+  - given-names: "Héctor Eduardo"
+    family-names: "Tovar Mendoza"
+  - given-names: "Jocelyn Anahid"
+    family-names: "Velarde Barrón"
+  - given-names: "Paola"
+    family-names: "Llamas Hernández"
+  - given-names: "Pablo Armando"
+    family-names: "Mac Beath Milián"
+date-released: "2026-06-13"
+repository-code: "https://github.com/JLDominguezM/HOPPY-Project"
+license: MIT
+keywords:
+  - legged robotics
+  - hopping robot
+  - MuJoCo
+  - hybrid control
+  - sim-to-real
+references:
+  - type: article
+    title: "HOPPY: An open-source kit for education with dynamic legged robots"
+    authors:
+      - given-names: "Joao"
+        family-names: "Ramos"
+      - given-names: "Yanran"
+        family-names: "Ding"
+      - given-names: "Young-woo"
+        family-names: "Sim"
+      - given-names: "Kevin"
+        family-names: "Murphy"
+      - given-names: "Daniel"
+        family-names: "Block"
+    url: "https://arxiv.org/abs/2010.14580"
+    notes: "Upstream HOPPY kit: https://github.com/RoboDesignLab/HOPPY-Project"

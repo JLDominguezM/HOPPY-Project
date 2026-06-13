@@ -1,23 +1,23 @@
-"""Comparación de integradores - justificación de la nota de Fase 3.1.
+"""Integrator comparison: why the models use implicitfast instead of RK4.
 
-La rúbrica recomienda integrator="RK4" (+ solver Newton, iterations=50,
-tolerance=1e-8). Nuestros modelos usan integrator="implicitfast". Este script
-corre la MISMA simulación (URDF real + controlador híbrido, hoppy_urdf.FORWARD)
-con ambas configuraciones y compara:
+A common recommendation is integrator="RK4" (+ Newton solver, iterations=50,
+tolerance=1e-8). These models use integrator="implicitfast". This script runs
+the SAME simulation (real URDF + hybrid controller, hoppy_urdf.FORWARD) with
+both configurations and compares:
 
-  - trayectoria del cuerpo y del pie (¿el salto es el mismo?)
-  - estabilidad (NaN / divergencia)
-  - costo computacional (tiempo de pared)
+  - body and foot trajectory (is the hop the same?)
+  - stability (NaN / divergence)
+  - compute cost (wall-clock time)
 
-Justificación física: implicitfast integra IMPLÍCITO los términos dependientes
-de velocidad (damping articular y armature) - exactamente los efectos que la
-rúbrica pide modelar - lo que lo hace estable con contacto duro a 1 kHz. RK4 es
-explícito: con contacto rígido (solref pequeño) y damping alto puede requerir
-pasos menores para no oscilar. La documentación de MuJoCo recomienda los
-integradores implícitos para modelos con contactos y desaconseja RK4 ahí.
+Physical reason: implicitfast integrates the velocity-dependent terms IMPLICITLY
+(joint damping and armature), which are exactly the effects this model adds, so
+it stays stable with hard contact at 1 kHz. RK4 is explicit: with stiff contact
+(small solref) and high damping it can need smaller steps to avoid ringing. The
+MuJoCo documentation recommends implicit integrators for models with contacts
+and advises against RK4 there.
 
-Salidas: figuras/integradores.png + métricas en stdout.
-Correr:  python3 comparacion_integradores.py
+Outputs: figuras/integrators.png + metrics on stdout.
+Run:     python3 comparacion_integradores.py
 """
 import re
 import time
@@ -35,7 +35,7 @@ ORIG_MAKE_XML = H.make_xml
 
 
 def _xml_rk4(xml):
-    # config EXACTA recomendada por la rúbrica
+    # the exact RK4 configuration often recommended for reference
     return xml.replace(
         '<option timestep="0.001" integrator="implicitfast" gravity="0 0 -9.81"/>',
         '<option timestep="0.001" integrator="RK4" gravity="0 0 -9.81" '
@@ -70,33 +70,33 @@ def simula(nombre, xml_patch=None):
 
 
 def main():
-    runs = [simula("implicitfast (nuestro)"),
-            simula("RK4 + Newton/50/1e-8 (rúbrica)", _xml_rk4)]
+    runs = [simula("implicitfast (ours)"),
+            simula("RK4 + Newton/50/1e-8", _xml_rk4)]
 
-    print(f"\n{'config':<34}{'estable':>8}{'pie despega':>13}{'saltos':>8}{'t pared':>9}")
-    print("-" * 72)
+    print(f"\n{'config':<24}{'stable':>8}{'foot clear':>13}{'hops':>8}{'wall':>9}")
+    print("-" * 62)
     for r in runs:
         m = r["t"] >= 1.0
         clear = max(0.0, r["foot_z"][m].max() - 0.016) if m.any() else 0.0
         ph = r["phase"][m]
         saltos = int(((ph[1:] - ph[:-1]) == -1).sum())
-        print(f"{r['nombre']:<34}{'NaN!' if r['nan'] else 'sí':>8}"
+        print(f"{r['nombre']:<24}{'NaN!' if r['nan'] else 'yes':>8}"
               f"{100*clear:>11.1f}cm{saltos:>8d}{r['wall']:>8.1f}s")
 
     fig, ax = plt.subplots(2, 1, figsize=(13, 7), sharex=True)
     for r, c in zip(runs, ("k", "tab:red")):
         ax[0].plot(r["t"], 100 * r["body_z"], c, lw=1.4, label=r["nombre"])
         ax[1].plot(r["t"], 100 * r["foot_z"], c, lw=1.4, label=r["nombre"])
-    ax[0].set_ylabel("altura del cuerpo (cm)")
-    ax[1].set_ylabel("altura del pie (cm)")
+    ax[0].set_ylabel("body height (cm)")
+    ax[1].set_ylabel("foot height (cm)")
     ax[1].set_xlabel("t (s)")
     for a in ax:
         a.grid(True, alpha=0.4)
         a.legend()
-    fig.suptitle("implicitfast vs RK4 (config recomendada) - misma sim, mismo controlador")
+    fig.suptitle("implicitfast vs RK4: same sim, same controller")
     fig.tight_layout()
-    fig.savefig("figuras/integradores.png", dpi=150, bbox_inches="tight")
-    print("\nguardado figuras/integradores.png")
+    fig.savefig("figuras/integrators.png", dpi=150, bbox_inches="tight")
+    print("\nsaved figuras/integrators.png")
 
 
 if __name__ == "__main__":

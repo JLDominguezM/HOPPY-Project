@@ -1,214 +1,221 @@
-# HOPPY: robot saltarin de una pierna
+# HOPPY: a one-legged hopping robot
 
-Simulacion en MuJoCo e implementacion fisica de HOPPY, un robot saltarin de una
-pierna montado en un boom giratorio. El proyecto parte del kit educativo
-[HOPPY de la Universidad de Illinois](https://github.com/RoboDesignLab/HOPPY-Project)
-(Ramos et al., [arXiv:2010.14580](https://arxiv.org/abs/2010.14580)) con un
-rediseno mecanico propio: pierna tipo ave con rodilla de cuatro barras, piezas
-impresas en 3D y tubos de PVC.
+MuJoCo simulation and physical implementation of HOPPY, a one-legged robot that
+hops around a rotating boom. The project starts from the
+[HOPPY educational kit from the University of Illinois](https://github.com/RoboDesignLab/HOPPY-Project)
+(Ramos et al., [arXiv:2010.14580](https://arxiv.org/abs/2010.14580)) and adds a
+mechanical redesign of our own: a bird-type leg with a four-bar knee, 3D-printed
+parts and PVC tubes.
 
-![Secuencia del salto en simulacion](mujoco/figuras/render_forward_secuencia.png)
+![Real URDF model hopping and turning around the post](mujoco/figuras/hop_sequence.png)
 
-El resultado final en hardware: el robot salta de forma autonoma y continua
-(64 saltos registrados por su propia telemetria, 0.27 s de vuelo por salto,
-unos 9 cm de apex), igualando el desempeno de su simulacion (0.25 s de vuelo).
+On hardware the robot hops on its own, continuously: 64 hops logged by its own
+telemetry, 0.27 s of flight per hop and roughly 9 cm of apex. That flight time
+is close to the simulation (about 0.33 s per hop).
 
-## Contenido del repositorio
+## Repository layout
 
-| Carpeta | Contenido |
+| Folder | Contents |
 |---|---|
-| `mujoco/` | Simulacion completa en MuJoCo: tres modelos, controlador hibrido, suite de verificacion y analisis |
-| `Microcontroller/` | Firmware C2000 (LaunchPad F28379D) del robot fisico: control en tiempo real a 1 kHz |
-| `CAD/` | Ensamble del rediseno (SolidWorks/STEP), parametros nominales y piezas a imprimir |
-| `Simulator_MATLAB/` | Simulador MATLAB original del paper, usado como referencia de validacion |
+| `mujoco/` | Full MuJoCo simulation: three models, the hybrid controller, a verification suite and the analysis scripts |
+| `Microcontroller/` | C2000 firmware (LaunchPad F28379D) for the physical robot: real-time control at 1 kHz |
+| `CAD/` | Redesign assembly (SolidWorks/STEP), nominal parameters and the parts to print |
+| `Simulator_MATLAB/` | Original MATLAB simulator from the paper, used as the validation reference |
 
-## Simulacion (mujoco/)
+## Simulation (mujoco/)
 
-Requisitos: Python 3 con `mujoco`, `numpy` y `matplotlib`.
+Requirements: Python 3 with `mujoco`, `numpy` and `matplotlib`.
 
-### Los tres modelos
+### The three models
 
-El proyecto evoluciono en tres modelos, cada uno con un proposito:
+The project grew through three models, each with its own purpose.
 
-| Modelo | Archivo | Geometria | Salto | Proposito |
+| Model | File | Geometry | Hop | Purpose |
 |---|---|---|---|---|
-| Abstracto | `tune_eval.py` | simplificada (anclada a `get_params.m`) | 7.2 cm | validacion contra el MATLAB del paper |
-| Gemelo CAD | `twin.py` | dimensiones, masas e inercias medidas del CAD | 8.8 cm | fidelidad estructural al rediseno |
-| URDF real | `hoppy_urdf.py` | exportado de SolidWorks (sw2urdf) | 7.6 cm de vuelo, avanza | el modelo que corre el control del robot |
+| Abstract | `tune_eval.py` | simplified (anchored to `get_params.m`) | 7.2 cm | validation against the paper's MATLAB |
+| CAD twin | `twin.py` | dimensions, masses and inertias measured from the CAD | 8.8 cm | structural fidelity to the redesign |
+| Real URDF | `hoppy_urdf.py` | exported from SolidWorks (sw2urdf) | foot clears 4.5 cm, turns around the post | the model that runs the robot's controller |
 
-Los tres comparten el mismo controlador (`controller.py`), un port fiel del
-simulador MATLAB del paper: maquina de estados FLIGHT/STANCE a 1 kHz, control
-cartesiano del pie por Jacobiano transpuesto en vuelo, perfil Bezier de fuerzas
-de reaccion en apoyo, modelo de actuador por voltaje con back-EMF y saturacion,
-y velocidad estimada por derivada filtrada (emulacion de encoder).
+The three share the same controller (`controller.py`), a faithful port of the
+paper's MATLAB simulator: a FLIGHT/STANCE state machine at 1 kHz, Cartesian foot
+control through the transposed Jacobian in flight, a Bezier reaction-force
+profile in stance, a voltage-based actuator model with back-EMF and saturation,
+and a velocity estimate from a filtered derivative (encoder emulation).
 
-### Como correr
+### How to run
 
-| Que | Comando |
+| What | Command |
 |---|---|
-| Ver el URDF real saltando | `python3 view_hop_urdf.py --viewer` |
-| Ver el gemelo CAD saltando | `python3 view_twin.py` |
-| Verificacion del abstracto vs MATLAB | `python3 verify.py` |
-| Verificacion del gemelo | `python3 -c "import twin; from verify import verify; verify(dict(twin.DEFAULTS), mdl=twin)"` |
-| Chequeo por componentes del gemelo | `python3 twin_check.py` |
-| Senales de todas las fases | `python3 plot_signals.py` |
-| Ablacion del modelo mecanico | `python3 ablacion.py` |
-| Comparacion de integradores | `python3 comparacion_integradores.py` |
-| Renders y videos (sin pantalla) | `MUJOCO_GL=egl python3 render_twin.py` |
+| Watch the real URDF hopping | `python3 view_hop_urdf.py --viewer` |
+| Watch the CAD twin hopping | `python3 view_twin.py` |
+| Verify the abstract model against MATLAB | `python3 verify.py` |
+| Verify the twin | `python3 -c "import twin; from verify import verify; verify(dict(twin.DEFAULTS), mdl=twin)"` |
+| Component check of the twin | `python3 twin_check.py` |
+| Signals from every phase | `python3 plot_signals.py` |
+| Mechanical-model ablation | `python3 ablacion.py` |
+| Integrator comparison | `python3 comparacion_integradores.py` |
+| Renders and videos (headless) | `MUJOCO_GL=egl python3 render_twin.py` |
 
-`verify.py` es deliberadamente exigente: pide empuje real (la fuerza de contacto
-carga de verdad), fase de vuelo, ausencia de aleteo y ciclo limite estable.
-Una metrica que solo cuenta despegues del pie acepta soluciones degeneradas
-(la pierna aleteando sin saltar); esta suite no.
+`verify.py` is strict on purpose. It asks for real push-off (the contact force
+actually loads), a flight phase, no foot flutter and a stable limit cycle. A
+metric that only counts foot lift-offs accepts degenerate solutions, such as a
+leg that flutters without hopping. This suite does not.
 
-## Parametros fisicos y su justificacion
+## Physical parameters and where they come from
 
-### Geometria de la pierna (medida del CAD y del documento de parametros nominales)
+### Leg geometry (measured from the CAD and the nominal-parameters document)
 
-| Constante | Valor | Que es |
+| Constant | Value | What it is |
 |---|---|---|
-| `LH` | 0.096 m | longitud del muslo (eje de cadera a eje de rodilla) |
-| `LK` | 0.1545 m | longitud de la pantorrilla (tubo) |
-| `DK` | 0.052 m | offset lateral del tubo respecto al eje de la rodilla |
-| `LKF` | 0.1635 m | pantorrilla efectiva, `sqrt(LK^2 + DK^2)` |
-| `LB`, `DB`, `HB` | 0.687, 0.187, 0.250 m | boom: pivote a cadera, offset lateral, altura del pivote |
+| `LH` | 0.096 m | thigh length (hip axis to knee axis) |
+| `LK` | 0.1545 m | shank length (tube) |
+| `DK` | 0.052 m | lateral offset of the tube from the knee axis |
+| `LKF` | 0.1635 m | effective shank, `sqrt(LK^2 + DK^2)` |
+| `LB`, `DB`, `HB` | 0.687, 0.187, 0.250 m | boom: pivot-to-hip, lateral offset, pivot height |
 
-La pierna del rediseno es tipo ave (espejo del HOPPY original): la rodilla
-apunta hacia atras y flexionarla manda el pie hacia adelante. El tubo nunca se
-alinea con el muslo; en el tope de extension ya forma unos 134 grados con el.
+The redesigned leg is bird-type (mirrored from the original HOPPY): the knee
+points backward, and bending it drives the foot forward. The tube never lines up
+with the thigh; at full extension it already sits at about 134 degrees to it.
 
-### Actuadores (datasheet goBILDA 5202, serie Yellow Jacket)
+### Actuators (goBILDA 5202 datasheet, Yellow Jacket series)
 
-| Constante | Valor | Justificacion |
+| Constant | Value | Reason |
 |---|---|---|
-| `NH` | 26.9 | reduccion del motor de cadera |
-| `NK` | 28.8 | reduccion efectiva de la rodilla (la escala del encoder convierte el 26.9 fisico en 28.8 efectivo, que coincide con el documento nominal del kit) |
-| `Rw` | 1.3 ohm | resistencia de armadura |
-| `kT` | 0.0135 N m/A | constante de torque |
-| `kv` | 0.0186 V s/rad | constante de back-EMF |
-| `VMAX`, `IMAX` | 12 V, 9.2 A | limites electricos reales; definen el torque maximo kT por N por IMAX (3.3 a 3.6 N m por junta) |
+| `NH` | 26.9 | hip motor reduction |
+| `NK` | 28.8 | effective knee reduction (the encoder scale turns the physical 26.9 into an effective 28.8, which matches the kit's nominal document) |
+| `Rw` | 1.3 ohm | armature resistance |
+| `kT` | 0.0135 N m/A | torque constant |
+| `kv` | 0.0186 V s/rad | back-EMF constant |
+| `VMAX`, `IMAX` | 12 V, 9.2 A | real electrical limits; they set the maximum torque kT * N * IMAX (3.3 to 3.6 N m per joint) |
 
-De estos se derivan dos efectos que la simulacion modela explicitamente:
+Two effects follow from these constants, and the simulation models both
+explicitly.
 
-- **Inercia reflejada del rotor** (`armature = N^2 * Ir`, con `Ir = 7e-6 kg m^2`).
-  Sin ella las aceleraciones son irreales: la ablacion muestra que el robot
-  "salta" 67 por ciento mas alto sin armature.
-- **Amortiguamiento equivalente del actuador** (`damping = kT^2 * N^2 / Rw`).
-  Es la disipacion electrica del motor reflejada a la junta; no es un numero
-  ajustado a mano sino derivado del modelo electrico.
+- **Reflected rotor inertia** (`armature = N^2 * Ir`, with `Ir = 7e-6 kg m^2`).
+  Without it the accelerations are unrealistic: the ablation shows the robot
+  "hops" 67 percent higher when armature is removed.
+- **Equivalent actuator damping** (`damping = kT^2 * N^2 / Rw`). This is the
+  motor's electrical dissipation reflected to the joint. It is not a hand-tuned
+  number; it comes from the electrical model.
 
-La saturacion NO es un clip de torque: el controlador convierte torque deseado a
-voltaje (`V = Rw/(kT N) tau + kv N qdot`), recorta a 12 V, calcula la corriente
-contra el back-EMF, la recorta a 9.2 A y recien ahi obtiene el torque aplicado.
-Asi el limite depende de la velocidad, como en el motor real.
+Saturation is not a torque clip. The controller turns desired torque into
+voltage (`V = Rw/(kT N) tau + kv N qdot`), clips that to 12 V, computes the
+current against the back-EMF, clips it to 9.2 A, and only then gets the applied
+torque. The limit therefore depends on speed, the same way it does in the real
+motor.
 
-### Resorte de rodilla
+### Knee spring
 
-El robot real lleva dos resortes de tension (Ks = 1.67 kN/m, L0 = 80 mm) en un
-arreglo serie-elastico a traves del cuatro barras. En el modelo se representa
-como resorte de junta (`stiffness` + `springref` en la rodilla). El resorte
-serie-elastico fiel deja la rodilla casi rigida con este controlador (el paper
-usa un control disenado para explotarlo); el trade-off esta documentado y la
-ablacion cuantifica el efecto del resorte usado.
+The real robot carries two tension springs (Ks = 1.67 kN/m, L0 = 80 mm) in a
+series-elastic arrangement through the four-bar. In the model this is a joint
+spring (`stiffness` plus `springref` at the knee). A faithful series-elastic
+spring leaves the knee almost rigid under this controller (the paper uses a
+controller designed to exploit it). The trade-off is documented, and the
+ablation measures the effect of the joint spring that is used.
 
-### Contacto pie-suelo
+### Foot-ground contact
 
-| Parametro | Valor | Justificacion |
+| Parameter | Value | Reason |
 |---|---|---|
-| `solref` | 0.0191 1 | contacto duro sin rebote numerico |
-| `solimp` | 0.95 0.99 0.001 | penetracion submilimetrica |
-| `friction` | 2.0 | el pie real es un regaton de goma; no debe patinar durante el empuje |
-| integrador | `implicitfast`, paso 1 ms | integra implicito los terminos dependientes de velocidad (damping y armature, exactamente lo que este modelo agrega); `comparacion_integradores.py` muestra que RK4 con la configuracion recomendada da el mismo salto, 15 por ciento mas lento |
+| `solref` | 0.0191 1 | hard contact, no numerical bounce |
+| `solimp` | 0.95 0.99 0.001 | sub-millimeter penetration |
+| `friction` | 2.0 | the real foot is a rubber tip and must not slip during push-off |
+| integrator | `implicitfast`, 1 ms step | integrates the velocity-dependent terms implicitly (damping and armature, exactly what this model adds); `comparacion_integradores.py` shows that RK4 with the recommended settings produces the same hop |
 
-La deteccion de touchdown y liftoff usa la fuerza normal de contacto contra un
-umbral. Es el mismo criterio del robot fisico, cuyo sensor de pie (SoftPot) se
-calibro en banco: 0 en el aire, alrededor de 200 rozando, 2870 cargado en
-reposo y 4095 a plena carga, con el umbral en 2048.
+Touchdown and lift-off are detected from the normal contact force against a
+threshold. This is the same criterion the physical robot uses, where the foot
+sensor (a SoftPot) was calibrated on the bench: 0 in the air, around 200 when
+grazing, 2870 loaded at rest and 4095 at full load, with the threshold at 2048.
 
-### Controlador (constantes del simulador MATLAB del paper)
+### Controller (constants from the paper's MATLAB simulator)
 
-| Constante | Valor | Rol |
+| Constant | Value | Role |
 |---|---|---|
-| `Kp_sw`, `Kd_sw` | 150, 5 | PD cartesiano del pie en vuelo (N/m, N s/m) |
-| `Krh` | 0.10 | colocacion de pie tipo Raibert |
-| `Tst` | 0.35 s | duracion nominal del apoyo |
-| `Fz_bz` | [0, 20, 100, 0, 0] | puntos de control Bezier de la fuerza vertical (pico real ~42 N) |
-| `Fx_bz` | [0, 0, -25, 0, 0] | empuje tangencial; su signo fija el sentido de avance |
-| `Kp_st`, `Kd_st` | 0.03, 0.08 | PD suave de junta en apoyo (regularizador) |
-| blending | 10 ms | mezcla aereo-apoyo para no meter escalones de torque |
-| `lambda` | 10 rad/s | filtro de la velocidad estimada (emulacion de encoder) |
+| `Kp_sw`, `Kd_sw` | 150, 5 | Cartesian foot PD in flight (N/m, N s/m) |
+| `Krh` | 0.10 | Raibert-style foot placement |
+| `Tst` | 0.35 s | nominal stance duration |
+| `Fz_bz` | [0, 20, 100, 0, 0] | Bezier control points for the vertical force (desired peak 42.8 N) |
+| `Fx_bz` | [0, 0, -25, 0, 0] | tangential push; its sign sets the direction of travel |
+| `Kp_st`, `Kd_st` | 0.03, 0.08 | soft joint PD in stance (regularizer) |
+| blending | 10 ms | flight-to-stance blend so no torque steps appear |
+| `lambda` | 10 rad/s | filter for the estimated velocity (encoder emulation) |
 
 ## Firmware (Microcontroller/)
 
-Firmware para la LaunchPad F28379D (C2000) sobre el ejemplo del kit original,
-con el mismo controlador del paper corriendo a 1 kHz. Toolchain: Code Composer
-Studio 12.8, compilador C2000 22.6, SYS/BIOS. El archivo activo es
+Firmware for the LaunchPad F28379D (C2000), built on the original kit example,
+running the same controller from the paper at 1 kHz. Toolchain: Code Composer
+Studio 12.8, C2000 compiler 22.6, SYS/BIOS. The active file is
 `blinky_rtos_flash/cpu01/cpu01_main.c`.
 
-Puntos clave de la implementacion:
+Implementation notes:
 
-- **Cinematica tipo ave**: IK de rama espejo y mapa polinomial del cuatro
-  barras de la rodilla, `q_rodilla = KA e^2 + KB e + KC` con `KA = -0.454`,
-  `KB = -1.534`, `KC = 0.80`, calibrado en banco con plomada y fotos (la
-  relacion efectiva del mecanismo varia de 1.5 en extension a 0.7 en flexion;
-  el signo negativo refleja la morfologia espejo). El torque de rodilla se
-  mapea por trabajo virtual con la derivada del mismo polinomio.
-- **Modelo electrico del motor en el lazo** (la misma ecuacion de la sim):
-  torque deseado a voltaje con compensacion de back-EMF, a PWM con el bus de
-  12 V como escala.
-- **Maquina de estados de salto continuo** (`JUMP_MODE`): touchdown por flanco
-  del sensor de pie con anti-rebote, empuje Bezier de apoyo, liftoff temprano
-  cuando el sensor se descarga, recuperacion aerea a la pose de aterrizaje.
-- **Telemetria a bordo**, legible en vivo por CCS Expressions: contador de
-  saltos, duracion del ultimo vuelo (la altura del apex es g t^2/8), duracion
-  real del ultimo apoyo y picos de PWM y recorrido de rodilla por empuje.
-- Seguridad: bandera de motores, limite de PWM ajustable en vivo y arranque
-  con valores inertes.
+- **Bird-type kinematics**: mirrored-branch IK and a polynomial map of the
+  four-bar knee, `q_knee = KA e^2 + KB e + KC` with `KA = -0.454`, `KB = -1.534`,
+  `KC = 0.80`, calibrated on the bench with a plumb line and photos. The
+  mechanism's effective ratio runs from 1.5 at extension to 0.7 at flexion; the
+  negative sign reflects the mirrored morphology. Knee torque is mapped by
+  virtual work using the derivative of the same polynomial.
+- **Motor electrical model in the loop** (the same equation as the sim): desired
+  torque to voltage with back-EMF compensation, then to PWM with the 12 V bus as
+  the scale.
+- **Continuous-hop state machine** (`JUMP_MODE`): touchdown on the foot-sensor
+  edge with debounce, Bezier push in stance, early lift-off when the sensor
+  unloads, and an aerial recovery to the landing pose.
+- **On-board telemetry**, readable live through CCS Expressions: hop counter,
+  duration of the last flight (apex height is g t^2 / 8), measured duration of
+  the last stance, and the peaks of PWM and knee travel per push.
+- Safety: a motor flag, a PWM limit adjustable live, and a startup with inert
+  values.
 
-El robot se balancea con un contrapeso en el boom (5 kg a 19 cm en el montaje
-actual, ajustado con el metodo del punto de flotacion: se busca la distancia
-que deja el boom neutro y se monta el peso a un 76 por ciento de ella, porque
-el balance total deja la pierna sin peso que la cargue).
+The robot is balanced with a counterweight on the boom (5 kg at 19 cm in the
+current setup), tuned with the float-point method: find the distance that leaves
+the boom neutral, then mount the weight at about 76 percent of it, because a full
+balance leaves the leg with no weight to load it.
 
-## Validacion y resultados
+## Validation and results
 
-- **Contra el MATLAB del paper**: la suite `verify.py` pasa 12 de 12 chequeos
-  reproduciendo el comportamiento del simulador original.
-- **Ablacion** (`mujoco/figuras/ablacion.png`): cuantifica el efecto de
-  armature, damping, resorte y saturacion sobre el salto; sin saturacion el
-  actuador ideal pide 13.2 A contra los 9.2 A fisicos.
-- **En hardware**: salto autonomo continuo en sitio, 64 saltos registrados,
-  0.27 s de vuelo por salto, motores trabajando dentro de sus limites.
+- **Against the paper's MATLAB**: the `verify.py` suite passes 12 of 12 checks,
+  reproducing the behavior of the original simulator.
+- **Ablation** (`mujoco/figuras/ablation.png`): measures the effect of armature,
+  damping, spring and saturation on the hop. Without saturation the ideal
+  actuator asks for 13.2 A against the 9.2 A the motor actually has.
+- **On hardware**: autonomous continuous hopping in place, 64 hops logged, 0.27 s
+  of flight per hop, motors working inside their limits.
 
-## Limitaciones conocidas
+![Mechanical-model ablation](mujoco/figuras/ablation.png)
 
-- El avance alrededor del poste con el empuje tangencial esta limitado por la
-  rigidez del poste del gantry (se mueve con la fuerza lateral sostenida); es
-  un tema estructural, no de control.
-- El resorte serie-elastico fiel requiere un controlador disenado para el (como
-  el del paper original); con este control se usa el resorte de junta suave.
-- El sensor de pie entrega posicion del punto de presion, no fuerza; el umbral
-  de contacto se calibro empiricamente.
+## Known limitations
 
-## Simulador MATLAB en Linux
+- Travel around the post under the tangential push is limited by the stiffness of
+  the gantry post, which moves under the sustained lateral force. This is a
+  structural issue, not a control one.
+- A faithful series-elastic spring needs a controller designed for it (such as
+  the one in the original paper); under this controller the soft joint spring is
+  used instead.
+- The foot sensor reports the position of the pressure point, not force, so the
+  contact threshold was calibrated empirically.
 
-El simulador de referencia corre en MATLAB R2026a:
+## MATLAB simulator on Linux
+
+The reference simulator runs on MATLAB R2026a:
 
 ```bash
 cd Simulator_MATLAB
-matlab        # dentro de la interfaz, ejecutar: MAIN
+matlab        # inside the interface, run: MAIN
 ```
 
-## Referencias
+## References
 
-- J. Ramos, Y. Ding, Y. Sim, K. Murphy, D. Block. "HOPPY: An open-source kit
-  for education with dynamic legged robots". arXiv:2010.14580.
-- Kit y codigo original: [RoboDesignLab/HOPPY-Project](https://github.com/RoboDesignLab/HOPPY-Project).
-- MuJoCo y la documentacion oficial de MJCF.
+- J. Ramos, Y. Ding, Y. Sim, K. Murphy, D. Block. "HOPPY: An open-source kit for
+  education with dynamic legged robots". arXiv:2010.14580.
+- Original kit and code: [RoboDesignLab/HOPPY-Project](https://github.com/RoboDesignLab/HOPPY-Project).
+- MuJoCo and the official MJCF documentation.
 
-## Equipo
+See [NOTICE](NOTICE) for attribution and [LICENSE](LICENSE) for terms of use.
 
-Hector Eduardo Tovar Mendoza, Jocelyn Anahid Velarde Barron, Paola Llamas
-Hernandez, Jose Luis Dominguez Morales, Pablo Armando Mac Beath Milian.
+## Authors
 
-Implementacion Robotica, junio 2026.
+Héctor Eduardo Tovar Mendoza, Jocelyn Anahid Velarde Barrón, Paola Llamas
+Hernández, José Luis Domínguez Morales, Pablo Armando Mac Beath Milián.
+
+Robotics Implementation, June 2026.

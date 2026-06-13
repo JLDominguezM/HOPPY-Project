@@ -1,25 +1,25 @@
-"""Ablación del modelo mecánico - Rúbrica Fase 2.2.
+"""Mechanical-model ablation.
 
-Demuestra con simulaciones comparativas la influencia de cada efecto físico del
-modelo (armature, damping equivalente, resorte paralelo de rodilla y saturación
-de torque) sobre el salto del URDF real con el controlador híbrido del paper
-(hoppy_urdf.FORWARD + controller.py).
+Uses comparative simulations to show how each physical effect in the model
+(armature, equivalent actuator damping, parallel knee spring and torque
+saturation) affects the hop of the real URDF model with the paper's hybrid
+controller (hoppy_urdf.FORWARD + controller.py).
 
-Cada variante apaga UN efecto y deja el resto intacto:
-  full        : modelo completo (baseline)
-  sin_armature: armature=0 en cadera y rodilla (sin inercia reflejada N^2*Ir)
-  sin_damping : damping=0 en cadera y rodilla (sin pérdidas del actuador;
-                el damping del gantry j_damp se conserva: es de la estructura)
-  sin_resorte : knee_stiff=0 (sin resorte paralelo de rodilla)
-  sin_satur   : VMAX/IMAX -> infinito (actuador ideal sin límites físicos)
+Each variant turns off ONE effect and leaves the rest intact:
+  full        : complete model (baseline)
+  no_armature : armature=0 at hip and knee (no reflected inertia N^2*Ir)
+  no_damping  : damping=0 at hip and knee (no actuator losses; the gantry
+                damping j_damp is kept, it belongs to the structure)
+  no_spring   : knee_stiff=0 (no parallel knee spring)
+  no_sat      : VMAX/IMAX -> infinity (ideal actuator with no physical limits)
 
-armature y damping están inyectados como constantes en el XML (no como params),
-así que se ablacionan parchando el XML que genera make_xml (monkeypatch).
-La saturación vive en el controlador (Ec.18: V<=12, i<=9.2) -> se ablaciona
-sobre la instancia de Hoppy.
+armature and damping are injected as constants in the XML (not as params),
+so they are ablated by patching the XML that make_xml produces (monkeypatch).
+Saturation lives in the controller (V<=12, i<=9.2), so it is ablated on the
+Hoppy instance.
 
-Salidas: figuras/ablacion.png + tabla de métricas en stdout.
-Correr:  python3 ablacion.py
+Outputs: figuras/ablation.png + a metrics table on stdout.
+Run:     python3 ablacion.py
 """
 import re
 
@@ -35,12 +35,12 @@ T_TOTAL = 6.0
 ORIG_MAKE_XML = H.make_xml
 
 
-def _xml_sin_armature(xml):
+def _xml_no_armature(xml):
     return re.sub(r'armature="[^"]*"', 'armature="0"', xml)
 
 
-def _xml_sin_damping(xml):
-    # solo theta3/theta4 (actuadores); el damping de theta1/theta2 es del gantry
+def _xml_no_damping(xml):
+    # only theta3/theta4 (actuators); theta1/theta2 damping belongs to the gantry
     def zero(m):
         return re.sub(r'damping="[^"]*"', 'damping="0"', m.group(0))
     return re.sub(r'<joint name="theta[34]"[^>]*>', zero, xml)
@@ -67,7 +67,7 @@ def simula(nombre, params=None, xml_patch=None, sin_saturacion=False):
         for k in keys:
             L[k].append(rec[k])
         if np.any(np.isnan(h.d.qpos)):
-            print(f"  {nombre}: NaN (divergió) en t={rec['t']:.2f}")
+            print(f"  {nombre}: NaN (diverged) at t={rec['t']:.2f}")
             break
     out = {k: np.array(v) for k, v in L.items()}
     out["nombre"] = nombre
@@ -75,18 +75,18 @@ def simula(nombre, params=None, xml_patch=None, sin_saturacion=False):
 
 
 def metricas(r):
-    """Métricas del régimen estable (descarta el primer segundo)."""
+    """Metrics over the steady regime (drops the first second)."""
     m = r["t"] >= 1.0
     t, fz, bz = r["t"][m], r["foot_z"][m], r["body_z"][m]
     vuelo = r["phase"][m] == 0
-    # despegue real del pie (clearance sobre el radio de la esfera del pie)
+    # real foot clearance (above the foot sphere radius)
     clear = max(0.0, fz.max() - 0.016)
-    # excursión del cuerpo (pico-valle del régimen)
+    # body excursion (peak to valley in the regime)
     exc = bz.max() - bz.min()
-    # avance alrededor del poste
+    # travel around the post
     th1 = r["theta1"][m]
     rate = (th1[-1] - th1[0]) / (t[-1] - t[0])
-    # saltos = flancos de apoyo->vuelo
+    # hops = stance->flight edges
     ph = r["phase"][m]
     saltos = int(((ph[1:] - ph[:-1]) == -1).sum())
     return dict(clear_cm=100 * clear, exc_cm=100 * exc, vuelo_pct=100 * vuelo.mean(),
@@ -96,45 +96,45 @@ def metricas(r):
 
 
 VARIANTES = [
-    ("full",         dict()),
-    ("sin_armature", dict(xml_patch=_xml_sin_armature)),
-    ("sin_damping",  dict(xml_patch=_xml_sin_damping)),
-    ("sin_resorte",  dict(params=dict(knee_stiff=0.0))),
-    ("sin_satur",    dict(sin_saturacion=True)),
+    ("full",        dict()),
+    ("no_armature", dict(xml_patch=_xml_no_armature)),
+    ("no_damping",  dict(xml_patch=_xml_no_damping)),
+    ("no_spring",   dict(params=dict(knee_stiff=0.0))),
+    ("no_sat",      dict(sin_saturacion=True)),
 ]
-COLORES = {"full": "k", "sin_armature": "tab:blue", "sin_damping": "tab:orange",
-           "sin_resorte": "tab:green", "sin_satur": "tab:red"}
+COLORES = {"full": "k", "no_armature": "tab:blue", "no_damping": "tab:orange",
+           "no_spring": "tab:green", "no_sat": "tab:red"}
 
 
 def main():
     runs, mets = [], []
     for nombre, kw in VARIANTES:
-        print(f"simulando {nombre} ...")
+        print(f"simulating {nombre} ...")
         r = simula(nombre, **kw)
         runs.append(r)
         mets.append(metricas(r))
 
-    # ---- tabla ----
-    cab = f"{'variante':<14}{'pie despega':>12}{'excursión':>11}{'% vuelo':>9}" \
-          f"{'saltos':>8}{'dθ1/dt':>9}{'τ_max':>8}{'i_max':>8}"
+    # ---- table ----
+    cab = f"{'variant':<14}{'foot clear':>12}{'excursion':>11}{'flight %':>9}" \
+          f"{'hops':>8}{'dtheta1/dt':>11}{'tau_max':>9}{'i_max':>8}"
     print("\n" + cab)
     print("-" * len(cab))
     for r, mt in zip(runs, mets):
         print(f"{r['nombre']:<14}{mt['clear_cm']:>10.1f}cm{mt['exc_cm']:>9.1f}cm"
-              f"{mt['vuelo_pct']:>8.0f}%{mt['saltos']:>8d}{mt['dtheta1']:>9.2f}"
-              f"{mt['tau_max']:>8.2f}{mt['i_max']:>8.1f}")
+              f"{mt['vuelo_pct']:>8.0f}%{mt['saltos']:>8d}{mt['dtheta1']:>11.2f}"
+              f"{mt['tau_max']:>9.2f}{mt['i_max']:>8.1f}")
 
-    # ---- figura ----
+    # ---- figure ----
     fig, ax = plt.subplots(2, 2, figsize=(14, 9))
     for r in runs:
         c = COLORES[r["nombre"]]
         lw = 2.2 if r["nombre"] == "full" else 1.3
         ax[0, 0].plot(r["t"], 100 * r["body_z"], c, lw=lw, label=r["nombre"])
         ax[0, 1].plot(r["t"], 100 * r["foot_z"], c, lw=lw, label=r["nombre"])
-    ax[0, 0].set_ylabel("altura del cuerpo (cm)")
-    ax[0, 0].set_title("Cuerpo: la ablación cambia el ciclo de salto")
-    ax[0, 1].set_ylabel("altura del pie (cm)")
-    ax[0, 1].set_title("Pie: despegue real (vuelo)")
+    ax[0, 0].set_ylabel("body height (cm)")
+    ax[0, 0].set_title("Body: ablation changes the hop cycle")
+    ax[0, 1].set_ylabel("foot height (cm)")
+    ax[0, 1].set_title("Foot: real clearance (flight)")
     for a in ax[0]:
         a.set_xlabel("t (s)")
         a.grid(True, alpha=0.4)
@@ -146,26 +146,26 @@ def main():
     cs = [COLORES[n] for n in nombres]
     ax[1, 0].bar(x, [mt["clear_cm"] for mt in mets], color=cs)
     ax[1, 0].set_xticks(x, nombres, rotation=15)
-    ax[1, 0].set_ylabel("despegue del pie (cm)")
-    ax[1, 0].set_title("Altura de salto por variante")
+    ax[1, 0].set_ylabel("foot clearance (cm)")
+    ax[1, 0].set_title("Hop height per variant")
     ax[1, 0].grid(True, axis="y", alpha=0.4)
-    ax[1, 1].bar(x - 0.2, [mt["tau_max"] for mt in mets], 0.4, color=cs, label="|τ| máx (N·m)")
+    ax[1, 1].bar(x - 0.2, [mt["tau_max"] for mt in mets], 0.4, color=cs, label="|tau| max (N.m)")
     ax[1, 1].bar(x + 0.2, [mt["i_max"] for mt in mets], 0.4, color=cs, alpha=0.45,
-                 label="|i| máx (A)")
+                 label="|i| max (A)")
     ax[1, 1].axhline(H.kT * H.NK * H.IMAX,
-                     color="r", ls="--", lw=1, label="τ físico máx (kT·N·i_max)")
+                     color="r", ls="--", lw=1, label="physical tau max (kT.N.i_max)")
     ax[1, 1].set_xticks(x, nombres, rotation=15)
     ax[1, 1].set_yscale("log")
-    ax[1, 1].set_title("Esfuerzo de actuador (log): sin saturación se dispara")
+    ax[1, 1].set_title("Actuator effort (log): without saturation it blows up")
     ax[1, 1].grid(True, axis="y", alpha=0.4)
     ax[1, 1].legend(fontsize=8)
 
-    fig.suptitle("Ablación del modelo mecánico - influencia de armature, damping, "
-                 "resorte paralelo y saturación (URDF real, controlador híbrido)", y=0.99)
+    fig.suptitle("Mechanical-model ablation: effect of armature, damping, "
+                 "parallel spring and saturation (real URDF, hybrid controller)", y=0.99)
     fig.tight_layout()
-    out = "figuras/ablacion.png"
+    out = "figuras/ablation.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
-    print(f"\nguardado {out}")
+    print(f"\nsaved {out}")
 
 
 if __name__ == "__main__":
