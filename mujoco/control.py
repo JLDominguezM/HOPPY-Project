@@ -1,7 +1,7 @@
 """Final controller run of the abstract model + plots.
 
 Uses the shared controller (controller.Hoppy), runs the simulation, prints
-honest metrics and generates figuras/results.png with 6 panels: body height,
+honest metrics and generates figures/results.png with 6 panels: body height,
 foot force, joint torques, voltage (12 V saturation), real vs filtered velocity
 and the limit cycle.
 
@@ -18,9 +18,9 @@ from tune_eval import DEFAULTS
 PARAMS = dict(DEFAULTS)   # faithful config + documented MuJoCo tuning in tune_eval.py
 
 
-def figuras(L):
+def figures(L):
     import os
-    os.makedirs("figuras", exist_ok=True)
+    os.makedirs("figures", exist_ok=True)
     t = L["t"]
     ph = L["phase"]
     # body apices
@@ -65,8 +65,8 @@ def figuras(L):
     ax[2, 1].plot(bz[half:], bzv[half:], "b", lw=0.5)
     ax[2, 1].grid(True); ax[2, 1].set_title("Limit cycle (body phase portrait)")
     ax[2, 1].set_xlabel("z [m]"); ax[2, 1].set_ylabel("dz/dt [m/s]")
-    fig.tight_layout(); fig.savefig("figuras/results.png", dpi=140)
-    print("figuras/results.png saved")
+    fig.tight_layout(); fig.savefig("figures/results.png", dpi=140)
+    print("figures/results.png saved")
 
 
 if __name__ == "__main__":
@@ -85,4 +85,4 @@ if __name__ == "__main__":
     print(f"Max voltage |V|={max(np.abs(L['V3']).max(), np.abs(L['V4']).max()):.2f} V (limit 12)")
     print(f"Max current |i|={max(np.abs(L['i3']).max(), np.abs(L['i4']).max()):.2f} A (limit 30)")
     print(f"Peak GRF={L['grf'][ss].max():.0f} N")
-    figuras(L)
+    figures(L)

@@ -16,8 +16,8 @@ it stays stable with hard contact at 1 kHz. RK4 is explicit: with stiff contact
 MuJoCo documentation recommends implicit integrators for models with contacts
 and advises against RK4 there.
 
-Outputs: figuras/integrators.png + metrics on stdout.
-Run:     python3 comparacion_integradores.py
+Outputs: figures/integrators.png + metrics on stdout.
+Run:     python3 integrators.py
 """
 import re
 import time
@@ -95,8 +95,8 @@ def main():
         a.legend()
     fig.suptitle("implicitfast vs RK4: same sim, same controller")
     fig.tight_layout()
-    fig.savefig("figuras/integrators.png", dpi=150, bbox_inches="tight")
-    print("\nsaved figuras/integrators.png")
+    fig.savefig("figures/integrators.png", dpi=150, bbox_inches="tight")
+    print("\nsaved figures/integrators.png")
 
 
 if __name__ == "__main__":

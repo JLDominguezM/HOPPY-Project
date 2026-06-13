@@ -39,14 +39,14 @@ README).
 - `tune_eval.py`, `twin.py`, `hoppy_urdf.py`: the three models (each builds its
   MJCF and its parameter set).
 - `controller.py`: the shared hybrid controller (`Hoppy`).
-- `control.py`: final run of the abstract model, metrics and `figuras/results.png`.
+- `control.py`: final run of the abstract model, metrics and `figures/results.png`.
 - `verify.py`: the verification suite, 12 pass/fail checks plus a comparison
   against the MATLAB reference.
 - `twin_check.py`: component-by-component check of the twin.
-- `plot_signals.py`: full signal analysis of the twin (`figuras/signals.png`).
-- `ablacion.py`: mechanical-model ablation (`figuras/ablation.png`).
-- `comparacion_integradores.py`: implicitfast vs RK4 (`figuras/integrators.png`).
-- `contrapeso.py`: counterweight (float-point balance).
+- `plot_signals.py`: full signal analysis of the twin (`figures/signals.png`).
+- `ablation.py`: mechanical-model ablation (`figures/ablation.png`).
+- `integrators.py`: implicitfast vs RK4 (`figures/integrators.png`).
+- `counterweight.py`: counterweight (float-point balance).
 - `render_*.py`, `view_*.py`: offscreen renders/videos and the interactive viewer.
 
 ## Usage
@@ -54,12 +54,12 @@ README).
 ```bash
 pip install mujoco numpy scipy matplotlib imageio imageio-ffmpeg
 
-python3 control.py                       # abstract model run + figuras/results.png
+python3 control.py                       # abstract model run + figures/results.png
 python3 verify.py                        # verification suite (pass/fail + vs MATLAB)
-python3 plot_signals.py                  # twin signals -> figuras/signals.png
-python3 ablacion.py                      # ablation -> figuras/ablation.png
-python3 comparacion_integradores.py      # integrators -> figuras/integrators.png
-MUJOCO_GL=egl python3 render_twin.py     # video figuras/twin_salto.mp4
+python3 plot_signals.py                  # twin signals -> figures/signals.png
+python3 ablation.py                      # ablation -> figures/ablation.png
+python3 integrators.py      # integrators -> figures/integrators.png
+MUJOCO_GL=egl python3 render_twin.py     # video figures/twin_salto.mp4
 python3 view_hop_urdf.py --viewer        # interactive viewer (real URDF)
 
 # MATLAB reference: cd ../Simulator_MATLAB && matlab -batch "export_ref"
@@ -80,7 +80,7 @@ stable limit cycle, travel around the post, and the electrical limits respected.
 Cartesian positions, raw versus filtered velocities, the contact force, the
 control torques against their physical limits, and the state machine.
 
-![HOPPY digital twin signals](figuras/signals.png)
+![HOPPY digital twin signals](figures/signals.png)
 
 ### Abstract model against MATLAB
 

@@ -10,7 +10,7 @@ The 2x4 grid is composited by hand (PIL) with explicit white gaps and the label
 burned into each frame, so nothing can overlap.
 
 Run:  MUJOCO_GL=egl python3 render_sequence.py
-Out:  figuras/hop_sequence.png
+Out:  figures/hop_sequence.png
 """
 import os
 os.environ.setdefault("MUJOCO_GL", "egl")
@@ -92,8 +92,8 @@ def main():
     dr.text(((total_w - (tb[2] - tb[0])) // 2, BORDER + (TITLE_H - (tb[3] - tb[1])) // 2 - 4),
             title, font=f_title, fill=(25, 25, 25))
 
-    os.makedirs("figuras", exist_ok=True)
-    out = "figuras/hop_sequence.png"
+    os.makedirs("figures", exist_ok=True)
+    out = "figures/hop_sequence.png"
     canvas.save(out)
     print(f"saved {out} {canvas.size} ({len(frames)} frames)")
 

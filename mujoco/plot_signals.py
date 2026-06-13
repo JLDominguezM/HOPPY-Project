@@ -1,6 +1,6 @@
 """Full signal analysis of the HOPPY digital twin.
 
-Generates figuras/signals.png with 8 subplots (4x2) covering the main signal
+Generates figures/signals.png with 8 subplots (4x2) covering the main signal
 families (joint and Cartesian positions and velocities, GRF, torques and FSM):
   [0,0] joint positions  q3 (hip), q4 (knee)
   [0,1] Cartesian foot position  x, y, z  (data.site_xpos[foot_site])
@@ -31,7 +31,7 @@ import twin
 from controller import Hoppy, LAMBDA
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-FIGDIR = os.path.join(HERE, "figuras")
+FIGDIR = os.path.join(HERE, "figures")
 T_TOTAL = 5.0                    # seconds to simulate
 FZ_CONTACT = 2.0                 # GRF threshold for "in stance" (N)
 

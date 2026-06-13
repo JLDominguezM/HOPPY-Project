@@ -18,8 +18,8 @@ so they are ablated by patching the XML that make_xml produces (monkeypatch).
 Saturation lives in the controller (V<=12, i<=9.2), so it is ablated on the
 Hoppy instance.
 
-Outputs: figuras/ablation.png + a metrics table on stdout.
-Run:     python3 ablacion.py
+Outputs: figures/ablation.png + a metrics table on stdout.
+Run:     python3 ablation.py
 """
 import re
 
@@ -163,7 +163,7 @@ def main():
     fig.suptitle("Mechanical-model ablation: effect of armature, damping, "
                  "parallel spring and saturation (real URDF, hybrid controller)", y=0.99)
     fig.tight_layout()
-    out = "figuras/ablation.png"
+    out = "figures/ablation.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"\nsaved {out}")
 

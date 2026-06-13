@@ -1,4 +1,4 @@
-"""contrapeso.py - cálculo del contrapeso del boom de HOPPY por BALANCE DE MOMENTOS.
+"""counterweight.py - cálculo del contrapeso del boom de HOPPY por BALANCE DE MOMENTOS.
 
 Por qué hace falta:
   El boom es una palanca que pivota en el gantry. De un lado cuelga el HOPPY (pierna +
@@ -17,7 +17,7 @@ contra el cual rebotar y el empuje sobrelanza el boom (en sim, 100% -> explota a
 deja un RESIDUAL (~24%) de desbalance = el peso efectivo que la pierna bota. Sweet spot ~76%.
 
 Uso:
-  python3 contrapeso.py                 # reporta para el modelo de sim (geometría del CAD)
+  python3 counterweight.py                 # reporta para el modelo de sim (geometría del CAD)
   # y edita FISICO abajo con tus medidas para tu boom real (85 cm hopper, 35 cm contrapeso).
 """
 import numpy as np

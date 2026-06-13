@@ -9,7 +9,7 @@ MuJoCo resuelva las mallas y la inercia.
 
 Uso:
   python3 load_hoppy_urdf.py              # compila e imprime info del modelo
-  python3 load_hoppy_urdf.py --render     # guarda figuras/urdf_import.png
+  python3 load_hoppy_urdf.py --render     # guarda figures/urdf_import.png
   python3 load_hoppy_urdf.py --save-mjcf  # exporta urdf/HOPPY-E0-final.mjcf.xml
   python3 load_hoppy_urdf.py --viewer     # viewer interactivo (necesita display)
 
@@ -88,9 +88,9 @@ def main():
         cam.distance = 1.5 * float(m.stat.extent)
         cam.azimuth, cam.elevation = 50, -18
         ren.update_scene(d, cam)
-        os.makedirs(os.path.join(HERE, "figuras"), exist_ok=True)
-        imageio.imwrite(os.path.join(HERE, "figuras", "urdf_import.png"), ren.render())
-        print("render -> figuras/urdf_import.png")
+        os.makedirs(os.path.join(HERE, "figures"), exist_ok=True)
+        imageio.imwrite(os.path.join(HERE, "figures", "urdf_import.png"), ren.render())
+        print("render -> figures/urdf_import.png")
 
     if "--viewer" in sys.argv:
         from mujoco import viewer as mjviewer

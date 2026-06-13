@@ -64,9 +64,9 @@ def main():
     cam.distance = 1.5 * float(m.stat.extent)
     cam.azimuth, cam.elevation = 50, -18
     ren.update_scene(d, cam)
-    os.makedirs(os.path.join(L.HERE, "figuras"), exist_ok=True)
-    imageio.imwrite(os.path.join(L.HERE, "figuras", "urdf_manip_pose.png"), ren.render())
-    print("render -> figuras/urdf_manip_pose.png")
+    os.makedirs(os.path.join(L.HERE, "figures"), exist_ok=True)
+    imageio.imwrite(os.path.join(L.HERE, "figures", "urdf_manip_pose.png"), ren.render())
+    print("render -> figures/urdf_manip_pose.png")
 
 
 if __name__ == "__main__":

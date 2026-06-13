@@ -64,7 +64,7 @@ FORWARD = dict(
     q3_ref=0.55, q4_ref=-0.95,        # valid crouch in the URDF joint space
     cw_mass=2.86, cw_x=0.35,          # counterweight: REAL physical boom arm (35 cm from the pivot),
                                       # mass by MOMENT BALANCE at ~76% (leaves effective weight on
-                                      # the leg; a 100% balance = 3.77 kg overshoots). See contrapeso.py
+                                      # the leg; a 100% balance = 3.77 kg overshoots). See counterweight.py
     vx_d=0.0,                         # desired Raibert velocity = 0 (pure MATLAB; Fx sets the travel)
 )
 

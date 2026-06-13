@@ -34,9 +34,9 @@ def main():
             next_frame += 1.0 / FPS
         if np.any(np.isnan(h.d.qpos)):
             break
-    os.makedirs("figuras", exist_ok=True)
-    imageio.mimsave("figuras/salto.mp4", frames, fps=FPS)
-    print(f"figuras/salto.mp4 guardado ({len(frames)} frames)")
+    os.makedirs("figures", exist_ok=True)
+    imageio.mimsave("figures/salto.mp4", frames, fps=FPS)
+    print(f"figures/salto.mp4 guardado ({len(frames)} frames)")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,11 @@
 # HOPPY: a one-legged hopping robot
 
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Python 3](https://img.shields.io/badge/Python-3-blue.svg)
+![MuJoCo 3.9](https://img.shields.io/badge/MuJoCo-3.9-informational.svg)
+![Firmware: C2000](https://img.shields.io/badge/firmware-C2000-lightgrey.svg)
+[![Paper: arXiv 2010.14580](https://img.shields.io/badge/paper-arXiv%3A2010.14580-b31b1b.svg)](https://arxiv.org/abs/2010.14580)
+
 MuJoCo simulation and physical implementation of HOPPY, a one-legged robot that
 hops around a rotating boom. The project starts from the
 [HOPPY educational kit from the University of Illinois](https://github.com/RoboDesignLab/HOPPY-Project)
@@ -7,11 +13,15 @@ hops around a rotating boom. The project starts from the
 mechanical redesign of our own: a bird-type leg with a four-bar knee, 3D-printed
 parts and PVC tubes.
 
-![Real URDF model hopping and turning around the post](mujoco/figuras/hop_sequence.png)
+![HOPPY hopping in MuJoCo](mujoco/figures/hop.gif)
 
 On hardware the robot hops on its own, continuously: 64 hops logged by its own
 telemetry, 0.27 s of flight per hop and roughly 9 cm of apex. That flight time
 is close to the simulation (about 0.33 s per hop).
+
+The same controller in simulation, frame by frame, advancing around the post:
+
+![Frames over 7 seconds; the boom advances around the post](mujoco/figures/hop_sequence.png)
 
 ## Contents
 
@@ -54,6 +64,32 @@ control through the transposed Jacobian in flight, a Bezier reaction-force
 profile in stance, a voltage-based actuator model with back-EMF and saturation,
 and a velocity estimate from a filtered derivative (encoder emulation).
 
+### Control architecture
+
+The controller is a hybrid state machine. Touchdown and lift-off are detected
+from the contact force.
+
+```mermaid
+stateDiagram-v2
+    [*] --> FLIGHT
+    FLIGHT --> STANCE: touchdown (contact force over threshold)
+    STANCE --> FLIGHT: liftoff (GRF below 1.5 N, or end of Tst)
+```
+
+Every control step runs at 1 kHz, the same loop in simulation and on the
+firmware:
+
+```mermaid
+flowchart LR
+    R[Read encoders] --> V[Filtered velocity, lambda = 10]
+    V --> P{Phase}
+    P -- FLIGHT --> A[Cartesian foot PD<br/>u = J^T F]
+    P -- STANCE --> S[Bezier reaction force<br/>u = -J^T Fx,Fz + soft joint PD]
+    A --> M[Voltage, back-EMF and saturation<br/>12 V and 9.2 A]
+    S --> M
+    M --> W[PWM to the motors]
+```
+
 ### How to run
 
 | What | Command |
@@ -64,8 +100,8 @@ and a velocity estimate from a filtered derivative (encoder emulation).
 | Verify the twin | `python3 -c "import twin; from verify import verify; verify(dict(twin.DEFAULTS), mdl=twin)"` |
 | Component check of the twin | `python3 twin_check.py` |
 | Signals from every phase | `python3 plot_signals.py` |
-| Mechanical-model ablation | `python3 ablacion.py` |
-| Integrator comparison | `python3 comparacion_integradores.py` |
+| Mechanical-model ablation | `python3 ablation.py` |
+| Integrator comparison | `python3 integrators.py` |
 | Renders and videos (headless) | `MUJOCO_GL=egl python3 render_twin.py` |
 
 `verify.py` is strict on purpose. It asks for real push-off (the contact force
@@ -133,7 +169,7 @@ ablation measures the effect of the joint spring that is used.
 | `solref` | 0.0191 1 | hard contact, no numerical bounce |
 | `solimp` | 0.95 0.99 0.001 | sub-millimeter penetration |
 | `friction` | 2.0 | the real foot is a rubber tip and must not slip during push-off |
-| integrator | `implicitfast`, 1 ms step | integrates the velocity-dependent terms implicitly (damping and armature, exactly what this model adds); `comparacion_integradores.py` shows that RK4 with the recommended settings produces the same hop |
+| integrator | `implicitfast`, 1 ms step | integrates the velocity-dependent terms implicitly (damping and armature, exactly what this model adds); `integrators.py` shows that RK4 with the recommended settings produces the same hop |
 
 Touchdown and lift-off are detected from the normal contact force against a
 threshold. This is the same criterion the physical robot uses, where the foot
@@ -189,13 +225,13 @@ balance leaves the leg with no weight to load it.
 
 - **Against the paper's MATLAB**: the `verify.py` suite passes 12 of 12 checks,
   reproducing the behavior of the original simulator.
-- **Ablation** (`mujoco/figuras/ablation.png`): measures the effect of armature,
+- **Ablation** (`mujoco/figures/ablation.png`): measures the effect of armature,
   damping, spring and saturation on the hop. Without saturation the ideal
   actuator asks for 13.2 A against the 9.2 A the motor actually has.
 - **On hardware**: autonomous continuous hopping in place, 64 hops logged, 0.27 s
   of flight per hop, motors working inside their limits.
 
-![Mechanical-model ablation](mujoco/figuras/ablation.png)
+![Mechanical-model ablation](mujoco/figures/ablation.png)
 
 ## Known limitations
 
