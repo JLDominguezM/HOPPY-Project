@@ -1,0 +1,36 @@
+HOPPY redesign and MuJoCo simulation
+=====================================
+
+This repository builds on the HOPPY educational kit developed by the
+RoboDesignLab at the University of Illinois at Urbana-Champaign:
+
+  J. Ramos, Y. Ding, Y. Sim, K. Murphy, D. Block.
+  "HOPPY: An open-source kit for education with dynamic legged robots."
+  arXiv:2010.14580
+  https://github.com/RoboDesignLab/HOPPY-Project
+
+Scope of the MIT license in this repository
+--------------------------------------------
+The LICENSE file applies to the original work of the authors listed in
+CITATION.cff:
+
+  - the MuJoCo simulation, controller and analysis scripts under mujoco/
+  - the mechanical redesign and printable parts under CAD/ (the IMP-* parts
+    and the bird-type four-bar leg)
+  - the firmware changes for continuous hopping under Microcontroller/
+  - the documentation (README files and figures)
+
+Redistributed upstream material
+--------------------------------
+Some material here comes from the upstream HOPPY kit and is included for
+reproducibility and to credit its authors. The upstream repository does not
+publish an explicit license file, so this material remains under the terms of
+its original authors and is not relicensed by the MIT file above:
+
+  - Simulator_MATLAB/        the original MATLAB reference simulator
+  - HOPPY_Technical_Guideline.pdf and the upstream BOM
+  - the original firmware example that Microcontroller/ is based on
+  - any original CAD provided by the kit
+
+If you reuse this project, please credit both the upstream HOPPY kit and this
+redesign. See CITATION.cff.

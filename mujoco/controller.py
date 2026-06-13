@@ -1,30 +1,29 @@
-"""Controlador hibrido de HOPPY, port fiel del simulador MATLAB.
+"""HOPPY hybrid controller, a faithful port of the MATLAB simulator.
 
-Una sola implementacion compartida por control.py (corrida+graficas),
-view.py (visor en vivo) y render.py (video), para que la ley de control no
-vuelva a divergir entre archivos.
+A single implementation shared by control.py (run + plots), view.py (live
+viewer) and render.py (video), so the control law does not drift between files.
 
-Replica (rubrica + Simulator_MATLAB):
-  Ec.17  Aereo: PD cartesiano del pie en el frame de cadera (boom/link2),
-         objetivo p_d = [Krh*vx, -0.15], u = J_hip^T * F_sw.
-  Ec.18  Actuador por voltaje + back-EMF + saturacion 12 V / 30 A.
-  Ec.19  Apoyo: u = -J_hip^T * [Fx; Fz] (Bezier) + PD suave de junta.
-  Ec.20  Blending aereo->apoyo en ~10 ms.
-  Fase5  Velocidad por derivada filtrada (lambda ~ 10), emula encoder.
-  FSM    touchdown = contacto del pie;  liftoff = GRF_z < 1.5 N (o s>=1).
+Replicates the MATLAB reference:
+  Flight:  Cartesian foot PD in the hip frame (boom/link2),
+           target p_d = [Krh*vx, p_toe_z], u = J_hip^T * F_sw.
+  Actuator: voltage + back-EMF + saturation (12 V and the current limit IMAX).
+  Stance:  u = -J_hip^T * [Fx; Fz] (Bezier) + soft joint PD.
+  Blending: flight -> stance over about 10 ms.
+  Velocity: filtered derivative (lambda ~ 10), emulates the encoder.
+  FSM:     touchdown = foot contact;  liftoff = GRF_z < 1.5 N (or s >= 1).
 """
 import numpy as np
 import mujoco
 
 import tune_eval
 
-LAMBDA = 10.0   # ancho de banda del filtro de velocidad (Fase 5)
+LAMBDA = 10.0   # velocity-filter bandwidth
 
 
 class Hoppy:
     def __init__(self, params=None, mdl=None):
-        # mdl = modulo del modelo (tune_eval = abstracto validado; twin = gemelo real).
-        # Todas las constantes (make_xml, bezier, motor, RBOOM, DT...) salen de ahi.
+        # mdl = the model module (tune_eval = validated abstract; twin = real twin).
+        # All constants (make_xml, bezier, motor, RBOOM, DT...) come from there.
         M = mdl if mdl is not None else tune_eval
         self.mdl = M
         self.bezier = M.bezier
@@ -51,7 +50,7 @@ class Hoppy:
         mujoco.mj_resetData(self.m, d)
         d.qpos[self.qadr["theta3"]] = self.p["q3_ref"]
         d.qpos[self.qadr["theta4"]] = self.p["q4_ref"]
-        d.qpos[self.qadr["theta2"]] = -0.06   # arranque: cadera algo arriba, cae suave
+        d.qpos[self.qadr["theta2"]] = -0.06   # start: hip slightly up, falls gently
         mujoco.mj_forward(self.m, d)
         self.qd_filt = np.zeros(2)
         self.q_prev = np.array([d.qpos[self.qadr["theta3"]], d.qpos[self.qadr["theta4"]]])
@@ -60,7 +59,7 @@ class Hoppy:
         self.t_td = 0.0
         self.t_lo = -1.0
 
-    # --- utilidades ---
+    # --- helpers ---
     def foot_force(self):
         f = 0.0
         for k in range(self.d.ncon):
@@ -68,11 +67,11 @@ class Hoppy:
             if self.fg in (c.geom1, c.geom2):
                 f6 = np.zeros(6)
                 mujoco.mj_contactForce(self.m, self.d, k, f6)
-                f += f6[0]                       # componente normal
+                f += f6[0]                       # normal component
         return f
 
     def _hip_frame(self):
-        """R2 (frame del boom/link2) y posicion de la cadera."""
+        """R2 (boom/link2 frame) and the hip position."""
         R2 = self.d.xmat[self.bframe].reshape(3, 3)
         hip = self.d.xpos[self.bframe]
         return R2, hip
@@ -80,17 +79,17 @@ class Hoppy:
     def _foot_jac_hip(self, R2):
         Jw = np.zeros((3, self.m.nv))
         mujoco.mj_jacSite(self.m, self.d, Jw, None, self.fs)
-        Jh = R2.T @ Jw[:, self.dof34]            # 3x2 en frame de cadera (boom)
-        # la pierna oscila en el plano TANGENCIAL-vertical (Y-Z del boom):
-        # Y = direccion de avance alrededor del poste, Z = vertical
-        return Jh[[1, 2], :]                     # filas y,z -> 2x2
+        Jh = R2.T @ Jw[:, self.dof34]            # 3x2 in the hip (boom) frame
+        # the leg swings in the TANGENTIAL-vertical plane (boom Y-Z):
+        # Y = travel direction around the post, Z = vertical
+        return Jh[[1, 2], :]                     # rows y,z -> 2x2
 
-    # --- un paso de control (no avanza la fisica) ---
+    # --- one control step (does not advance the physics) ---
     def control_step(self):
         d, p = self.d, self.p
         q34 = np.array([d.qpos[self.qadr["theta3"]], d.qpos[self.qadr["theta4"]]])
         qd_real = np.array([d.qvel[self.dof34[0]], d.qvel[self.dof34[1]]])
-        # velocidad por derivada filtrada (Fase 5, emula encoder 28 CPR)
+        # velocity from a filtered derivative (emulates a 28 CPR encoder)
         af = LAMBDA * self.DT / (1 + LAMBDA * self.DT)
         self.qd_filt += af * ((q34 - self.q_prev) / self.DT - self.qd_filt)
         self.q_prev = q34.copy()
@@ -99,21 +98,21 @@ class Hoppy:
         R2, hip = self._hip_frame()
         foot = d.site_xpos[self.fs]
         p_hip = R2.T @ (foot - hip)
-        p_xz = np.array([p_hip[1], p_hip[2]])    # [tangencial Y, vertical Z]
+        p_xz = np.array([p_hip[1], p_hip[2]])    # [tangential Y, vertical Z]
         Jhip = self._foot_jac_hip(R2)
         v_xz = Jhip @ qf
 
-        # --- AEREO (Ec.17) ---
-        # vx = velocidad tangencial (avance alrededor del poste) = dtheta1 * Rboom.
-        # vx_d = velocidad de avance DESEADA (Raibert): con vx_d=0 el pie se coloca para
-        # llevar vx->0 (salta en sitio); con vx_d!=0 regula vx hacia vx_d (AVANZA). El
-        # default 0 deja el comportamiento original/MATLAB intacto.
+        # --- FLIGHT ---
+        # vx = tangential velocity (travel around the post) = dtheta1 * Rboom.
+        # vx_d = desired travel velocity (Raibert): with vx_d=0 the foot is placed
+        # to drive vx->0 (hops in place); with vx_d!=0 it regulates vx toward vx_d
+        # (travels). The default 0 leaves the original/MATLAB behavior intact.
         vx = d.qvel[self.vadr["theta1"]] * self.RBOOM
         p_d = np.array([p["krh"] * (vx - p.get("vx_d", 0.0)), p["p_toe_z"]])
         F_sw = p["kp_sw"] * (p_d - p_xz) + p["kd_sw"] * (-v_xz)
         u_air = Jhip.T @ F_sw
 
-        # --- APOYO (Ec.19) ---
+        # --- STANCE ---
         s = min(max((self.t - self.t_td) / p["Tst"], 0.0), 1.0)
         Fz = self.bezier(self.FZ_BZ, s) * p["fz_scale"]
         Fx = self.bezier(self.FX_BZ, s) * p["fx_scale"]
@@ -121,14 +120,14 @@ class Hoppy:
         tau_fb = p["kp_st"] * (q_d - q34) + p["kd_st"] * (-qf)
         u_st = -Jhip.T @ np.array([Fx, Fz]) + tau_fb
 
-        # --- blending (Ec.20) ---
+        # --- blending ---
         if self.phase == "stance":
             al = min(1.0, (self.t - self.t_td) / p["blend"])
             u = al * u_st + (1 - al) * u_air
         else:
             u = u_air
 
-        # --- voltaje + back-EMF + saturacion (Ec.18) ---
+        # --- voltage + back-EMF + saturation ---
         N, Rw, kT, kv = self.N, self.Rw, self.kT, self.kv
         V = (Rw / (kT * N)) * u + kv * N * qf
         V = np.clip(V, -self.VMAX, self.VMAX)
@@ -165,7 +164,7 @@ class Hoppy:
 
 
 def simulate(params=None, t_total=8.0, mdl=None):
-    """Corre la simulacion y devuelve los logs como arrays."""
+    """Run the simulation and return the logs as arrays."""
     h = Hoppy(params, mdl=mdl)
     DT = h.DT
     keys = None

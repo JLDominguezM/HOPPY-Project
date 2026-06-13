@@ -2,7 +2,7 @@
 CAD como eslabones, dimensiones y masas medidas. Camara que sigue al hoppy.
 
 Uso:  MUJOCO_GL=egl python3 render_twin.py
-Sale: figuras/twin_salto.mp4  y  figuras/twin_hero.png
+Sale: figures/twin_salto.mp4  y  figures/twin_hero.png
 """
 import os
 os.environ.setdefault("MUJOCO_GL", "egl")
@@ -33,11 +33,11 @@ def main():
             cam.elevation = -11; cam.distance = 0.85
             ren.update_scene(h.d, cam); img = ren.render(); frames.append(img)
             if not hero and h.t > 3.5:
-                imageio.imwrite("figuras/twin_hero.png", img); hero = True
+                imageio.imwrite("figures/twin_hero.png", img); hero = True
             nf += 1.0 / FPS
-    os.makedirs("figuras", exist_ok=True)
-    imageio.mimsave("figuras/twin_salto.mp4", frames, fps=FPS)
-    print(f"figuras/twin_salto.mp4 ({len(frames)} frames) + figuras/twin_hero.png")
+    os.makedirs("figures", exist_ok=True)
+    imageio.mimsave("figures/twin_salto.mp4", frames, fps=FPS)
+    print(f"figures/twin_salto.mp4 ({len(frames)} frames) + figures/twin_hero.png")
 
 
 if __name__ == "__main__":

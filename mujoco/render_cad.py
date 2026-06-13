@@ -4,7 +4,7 @@ al yaw theta1) para ver la pierna en el plano tangencial mientras avanza alreded
 del poste. Backend EGL.
 
 Uso:  MUJOCO_GL=egl python3 render_cad.py
-Sale: figuras/salto_cad.mp4  y  figuras/hoppy_real.png (still hero)
+Sale: figures/salto_cad.mp4  y  figures/hoppy_real.png (still hero)
 """
 import os
 os.environ.setdefault("MUJOCO_GL", "egl")
@@ -43,11 +43,11 @@ def main():
             img = ren.render()
             frames.append(img)
             if not hero_saved and h.t > 4.7:       # still hero en regimen
-                imageio.imwrite("figuras/hoppy_real.png", img); hero_saved = True
+                imageio.imwrite("figures/hoppy_real.png", img); hero_saved = True
             next_frame += 1.0 / FPS
-    os.makedirs("figuras", exist_ok=True)
-    imageio.mimsave("figuras/salto_cad.mp4", frames, fps=FPS)
-    print(f"figuras/salto_cad.mp4 ({len(frames)} frames) + figuras/hoppy_real.png")
+    os.makedirs("figures", exist_ok=True)
+    imageio.mimsave("figures/salto_cad.mp4", frames, fps=FPS)
+    print(f"figures/salto_cad.mp4 ({len(frames)} frames) + figures/hoppy_real.png")
 
 
 if __name__ == "__main__":
