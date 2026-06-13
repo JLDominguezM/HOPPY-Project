@@ -233,6 +233,19 @@ balance leaves the leg with no weight to load it.
 
 ![Mechanical-model ablation](mujoco/figures/ablation.png)
 
+### Simulation vs hardware
+
+Everything below is measured, not assumed.
+
+| Metric | Simulation | Real robot |
+|---|---|---|
+| Control loop | 1 kHz | 1 kHz (C2000) |
+| Contact detection | GRF over threshold | SoftPot over 2048 |
+| Velocity filter | lambda = 10 | lambda = 10 |
+| Counterweight moment | 1.00 kg m | 0.95 kg m |
+| Flight per hop | about 0.33 s | 0.27 s |
+| Continuous hopping | stable limit cycle | 64 hops logged |
+
 ## Known limitations
 
 - Travel around the post under the tangential push is limited by the stiffness of
