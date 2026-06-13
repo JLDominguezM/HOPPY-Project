@@ -39,10 +39,10 @@ The same controller in simulation, frame by frame, advancing around the post:
 
 | Folder | Contents |
 |---|---|
-| `mujoco/` | Full MuJoCo simulation: three models, the hybrid controller, a verification suite and the analysis scripts |
-| `Microcontroller/` | C2000 firmware (LaunchPad F28379D) for the physical robot: real-time control at 1 kHz |
-| `CAD/` | Redesign assembly (SolidWorks/STEP), nominal parameters and the parts to print |
-| `Simulator_MATLAB/` | Original MATLAB simulator from the paper, used as the validation reference |
+| [`mujoco/`](mujoco/README.md) | Full MuJoCo simulation: three models, the hybrid controller, a verification suite and the analysis scripts |
+| [`Microcontroller/`](Microcontroller/README.md) | C2000 firmware (LaunchPad F28379D) for the physical robot: real-time control at 1 kHz |
+| [`CAD/`](CAD/STL_imprimir/README.md) | Redesign assembly (SolidWorks/STEP), nominal parameters and the parts to print |
+| [`Simulator_MATLAB/`](Simulator_MATLAB/README.md) | Original MATLAB simulator from the paper, used as the validation reference |
 
 ## Simulation (mujoco/)
 
