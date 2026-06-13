@@ -90,9 +90,9 @@ control torques against their physical limits, and the state machine.
 | Max hip height (m) | 0.187 | 0.187 |
 | Hop amplitude (cm) | 7.2 | 7.2 |
 | Frequency (Hz) | 2.5 | 2.2 |
-| Stance fraction (%) | 51 | 60 |
+| Stance fraction (%) | 52 | 60 |
 | Leg q4 min (rad) | -2.32 | -2.27 |
-| Travel around the post | yes (~1.5 turns / 10 s) | yes |
+| Travel around the post | yes (~1.2 turns over the 8 s run) | yes |
 | Peak GRF (N) | 84 | 30 |
 
 Same gait (compress, push, fly, land), the same hip amplitude and range

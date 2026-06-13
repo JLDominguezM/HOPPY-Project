@@ -30,10 +30,10 @@ Requirements: Python 3 with `mujoco`, `numpy` and `matplotlib`.
 
 The project grew through three models, each with its own purpose.
 
-| Model | File | Geometry | Hop | Purpose |
+| Model | File | Geometry | Hop (steady regime) | Purpose |
 |---|---|---|---|---|
-| Abstract | `tune_eval.py` | simplified (anchored to `get_params.m`) | 7.2 cm | validation against the paper's MATLAB |
-| CAD twin | `twin.py` | dimensions, masses and inertias measured from the CAD | 8.8 cm | structural fidelity to the redesign |
+| Abstract | `tune_eval.py` | simplified (anchored to `get_params.m`) | body rises 7.2 cm | validation against the paper's MATLAB |
+| CAD twin | `twin.py` | dimensions, masses and inertias measured from the CAD | body rises 5.6 cm | structural fidelity to the redesign |
 | Real URDF | `hoppy_urdf.py` | exported from SolidWorks (sw2urdf) | foot clears 4.5 cm, turns around the post | the model that runs the robot's controller |
 
 The three share the same controller (`controller.py`), a faithful port of the
@@ -94,9 +94,10 @@ explicitly.
 - **Reflected rotor inertia** (`armature = N^2 * Ir`, with `Ir = 7e-6 kg m^2`).
   Without it the accelerations are unrealistic: the ablation shows the robot
   "hops" 67 percent higher when armature is removed.
-- **Equivalent actuator damping** (`damping = kT^2 * N^2 / Rw`). This is the
-  motor's electrical dissipation reflected to the joint. It is not a hand-tuned
-  number; it comes from the electrical model.
+- **Equivalent actuator damping** (`damping = 0.5 * kT^2 * N^2 / Rw`). This is
+  the motor's electrical dissipation reflected to the joint. The 0.5 keeps it
+  from double-counting the dissipation the voltage model already adds. It is not
+  a hand-tuned number; it comes from the electrical model.
 
 Saturation is not a torque clip. The controller turns desired torque into
 voltage (`V = Rw/(kT N) tau + kv N qdot`), clips that to 12 V, computes the
