@@ -13,6 +13,18 @@ On hardware the robot hops on its own, continuously: 64 hops logged by its own
 telemetry, 0.27 s of flight per hop and roughly 9 cm of apex. That flight time
 is close to the simulation (about 0.33 s per hop).
 
+## Contents
+
+- [Repository layout](#repository-layout)
+- [Simulation (mujoco/)](#simulation-mujoco)
+- [Physical parameters and where they come from](#physical-parameters-and-where-they-come-from)
+- [Firmware (Microcontroller/)](#firmware-microcontroller)
+- [Validation and results](#validation-and-results)
+- [Known limitations](#known-limitations)
+- [MATLAB simulator on Linux](#matlab-simulator-on-linux)
+- [References](#references)
+- [Authors](#authors)
+
 ## Repository layout
 
 | Folder | Contents |
@@ -211,6 +223,30 @@ matlab        # inside the interface, run: MAIN
   education with dynamic legged robots". arXiv:2010.14580.
 - Original kit and code: [RoboDesignLab/HOPPY-Project](https://github.com/RoboDesignLab/HOPPY-Project).
 - MuJoCo and the official MJCF documentation.
+
+### How to cite
+
+A `CITATION.cff` file is included, so GitHub shows a "Cite this repository"
+button. In BibTeX:
+
+```bibtex
+@software{hoppy_redesign_2026,
+  author = {Dom\'inguez Morales, Jos\'e Luis and Tovar Mendoza, H\'ector Eduardo
+            and Velarde Barr\'on, Jocelyn Anahid and Llamas Hern\'andez, Paola
+            and Mac Beath Mili\'an, Pablo Armando},
+  title  = {HOPPY redesign: MuJoCo simulation and physical implementation},
+  year   = {2026},
+  url    = {https://github.com/JLDominguezM/HOPPY-Project}
+}
+
+@article{ramos2020hoppy,
+  author  = {Ramos, Joao and Ding, Yanran and Sim, Young-woo and Murphy, Kevin
+             and Block, Daniel},
+  title   = {{HOPPY}: An open-source kit for education with dynamic legged robots},
+  journal = {arXiv preprint arXiv:2010.14580},
+  year    = {2020}
+}
+```
 
 See [NOTICE](NOTICE) for attribution and [LICENSE](LICENSE) for terms of use.
 

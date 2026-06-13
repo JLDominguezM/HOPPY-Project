@@ -1,9 +1,10 @@
 """Hero figure: a strip of frames of the real URDF model hopping and turning
 around the post.
 
-Runs the URDF model (hoppy_urdf.FORWARD) with the hybrid controller, captures
-one frame per second from a fixed camera (so the boom sweeping around the post
-is visible) and lays them out in a 2x4 grid.
+Runs the URDF model (hoppy_urdf.FORWARD) with the hybrid controller and captures
+one frame per second. The camera follows the hip and its azimuth tracks the boom
+yaw (theta1), so the leg stays framed and large while the yaw label shows the
+robot advancing around the post.
 
 Run:  MUJOCO_GL=egl python3 render_sequence.py
 Out:  figuras/hop_sequence.png
@@ -21,24 +22,29 @@ import hoppy_urdf as H
 
 W, Ht = 640, 480          # MuJoCo default offscreen framebuffer
 T_TOTAL = 7.0
-TIMES = list(range(8))            # frames at t = 0, 1, ..., 7 s
+TIMES = list(range(8))    # frames at t = 0, 1, ..., 7 s
 
 
 def main():
     h = Hoppy(dict(H.FORWARD), mdl=H)
+    # brighten the scene a little so the robot reads clearly against the floor
+    h.m.vis.headlight.ambient[:] = [0.5, 0.5, 0.5]
+    h.m.vis.headlight.diffuse[:] = [0.6, 0.6, 0.6]
     ren = mujoco.Renderer(h.m, Ht, W)
     cam = mujoco.MjvCamera()
-    cam.lookat[:] = [0.0, 0.0, 0.12]
-    cam.azimuth = 52
-    cam.elevation = -13
-    cam.distance = 1.9
 
     frames, yaws, want = [], [], list(TIMES)
     for _ in range(int(T_TOTAL / 0.001) + 1):
         if want and h.t >= want[0] - 1e-9:
+            hip = h.d.xpos[h.bframe]
+            th1 = h.d.qpos[h.qadr["theta1"]]
+            cam.lookat[:] = [hip[0], hip[1], hip[2] - 0.05]
+            cam.azimuth = np.degrees(th1) + 70    # 3/4 tangential view (leg side)
+            cam.elevation = -11
+            cam.distance = 0.85
             ren.update_scene(h.d, cam)
             frames.append(ren.render())
-            yaws.append(float(np.degrees(h.d.qpos[h.qadr["theta1"]])))
+            yaws.append(float(np.degrees(th1)))
             want.pop(0)
         h.step()
         if np.any(np.isnan(h.d.qpos)):
@@ -51,7 +57,7 @@ def main():
             ax.imshow(frames[k])
             ax.set_title(f"t = {TIMES[k]} s    yaw = {yaws[k]:+.0f} deg", fontsize=10)
     fig.suptitle("HOPPY real URDF model: hopping and turning around the post",
-                 fontsize=14, y=0.98)
+                 fontsize=14, y=0.99)
     fig.tight_layout()
     os.makedirs("figuras", exist_ok=True)
     out = "figuras/hop_sequence.png"

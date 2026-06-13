@@ -1,0 +1,8 @@
+# Python dependencies for the MuJoCo simulation (mujoco/).
+# Versions in parentheses are the ones this was tested with.
+mujoco>=3.9            # (3.9.0)
+numpy>=1.24            # (2.2.6)
+scipy>=1.10            # (1.17.0)
+matplotlib>=3.7        # (3.10.7)
+imageio>=2.30          # (2.37.3)
+imageio-ffmpeg>=0.4    # video export for the render scripts
